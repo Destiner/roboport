@@ -15,11 +15,9 @@
     "./skills": "./src/skills/index.ts"
   },
   "scripts": {
-    "start": "bun run src/index.ts",
-    "dev": "bun run --hot src/index.ts",
-    "lint": "bun run lint:prettier && bun run lint:eslint",
-    "lint:prettier": "prettier -c \"src/**/*.{json,js,ts}\"",
-    "lint:eslint": "eslint \"src/**/*.{js,ts}\"",
+    "check": "bun run check:prettier && bun run check:eslint",
+    "check:prettier": "prettier -c \"src/**/*.{json,js,ts}\"",
+    "check:eslint": "eslint \"src/**/*.{js,ts}\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

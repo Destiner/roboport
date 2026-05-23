@@ -5,7 +5,7 @@ Minimal TypeScript framework for building LLM agents.
 ## Commands
 
 - `bun install` - Install dependencies
-- `bun run lint` - Prettier + ESLint
+- `bun run check` - Prettier + ESLint
 - `bun run typecheck`
 
 No test suite yet.
@@ -34,4 +34,4 @@ No test suite yet.
 ## Conventions
 
 - Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`).
-- Run `bun run lint && bun run typecheck` before committing.
+- Run `bun run check && bun run typecheck` before committing.

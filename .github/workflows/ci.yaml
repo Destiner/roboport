@@ -24,8 +24,8 @@ jobs:
       - name: Clean install
         run: bun install
 
-      - name: Lint
-        run: bun run lint
+      - name: Check
+        run: bun run check
 
       - name: Type checking
         run: bun run typecheck

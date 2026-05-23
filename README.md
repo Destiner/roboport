@@ -44,7 +44,7 @@ agent.on('grafana:alert', (alert) => {
 
 ```sh
 bun install
-bun run lint
+bun run check
 bun run typecheck
 ```
 
