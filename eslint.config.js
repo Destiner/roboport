@@ -1,11 +1,11 @@
 import js from '@eslint/js';
-import eslintPluginImportX from 'eslint-plugin-import-x';
+import { flatConfigs } from 'eslint-plugin-import-x';
 import { configs as tsConfigs, parser as tsParser } from 'typescript-eslint';
 
 export default [
   js.configs.recommended,
-  eslintPluginImportX.flatConfigs.recommended,
-  eslintPluginImportX.flatConfigs.typescript,
+  flatConfigs.recommended,
+  flatConfigs.typescript,
   ...tsConfigs.recommended,
   {
     languageOptions: {
