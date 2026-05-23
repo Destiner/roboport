@@ -119,7 +119,7 @@ function cron(opts: CronOptions): Trigger<CronEvent> {
       let stopped = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
-      const schedule = (): void => {
+      function schedule(): void {
         if (stopped) return;
         const now = new Date();
         const next = nextRun(opts.schedule, now);
@@ -129,7 +129,7 @@ function cron(opts: CronOptions): Trigger<CronEvent> {
           emit({ firedAt: new Date() });
           schedule();
         }, delay);
-      };
+      }
 
       schedule();
 

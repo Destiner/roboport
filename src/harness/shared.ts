@@ -5,23 +5,25 @@ import { z } from 'zod';
 
 import { Tool, type SearchHit, type ToolContext } from '@/core';
 
-const notImplemented = (name: string) => async (): Promise<never> => {
-  throw new Error(`Tool "${name}" is not implemented.`);
-};
+function notImplemented(name: string): () => Promise<never> {
+  return async (): Promise<never> => {
+    throw new Error(`Tool "${name}" is not implemented.`);
+  };
+}
 
-const serializeShellResult = (
+function serializeShellResult(
   stdout: string,
   stderr: string,
   exitCode: number,
-): string => {
+): string {
   const parts: string[] = [];
   if (stdout) parts.push(stdout.trimEnd());
   if (stderr) parts.push(`stderr:\n${stderr.trimEnd()}`);
   if (exitCode !== 0) parts.push(`Exit code: ${exitCode}`);
   return parts.join('\n\n');
-};
+}
 
-const runShell = async ({
+async function runShell({
   cmd,
   timeout,
   workdir,
@@ -33,7 +35,7 @@ const runShell = async ({
   workdir?: string;
   shell?: string;
   login?: boolean;
-}): Promise<string> => {
+}): Promise<string> {
   const shellPath = shell ?? 'bash';
   const proc = Bun.spawn([shellPath, login === false ? '-c' : '-lc', cmd], {
     cwd: workdir,
@@ -49,7 +51,7 @@ const runShell = async ({
   clearTimeout(timer);
 
   return serializeShellResult(stdout, stderr, exitCode);
-};
+}
 
 const bash = new Tool({
   name: 'Bash',
