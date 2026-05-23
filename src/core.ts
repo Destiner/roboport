@@ -218,7 +218,7 @@ class Agent {
       const skillsList = this.skills
         .map((skill) => `- ${skill.name}: ${skill.description}`)
         .join('\n');
-      system = `${system}\n\n# Skills available\n${skillsList}`;
+      system = `${system}\n\n# Skills\nThe following skills are available. When a task matches one, call the \`Skill\` tool with that skill's name to load its full content before proceeding.\n\n${skillsList}`;
     }
     const deferred = allTools.filter((tool) => tool.deferred);
     if (deferred.length > 0) {
@@ -228,11 +228,39 @@ class Agent {
     return system;
   }
 
+  private buildSkillTool(): Tool {
+    const byName = new Map(this.skills.map((skill) => [skill.name, skill]));
+    return new Tool({
+      name: 'Skill',
+      description:
+        'Load the full content of a skill listed under "# Skills" in the system prompt. Call this when you decide a listed skill applies to the current task; the returned content extends your instructions for the rest of the session.',
+      inputSchema: z.object({
+        skill: z
+          .string()
+          .describe('Name of the skill to load (must match a listed skill).'),
+      }),
+      execute: ({ skill }): string => {
+        const found = byName.get(skill);
+        if (!found) {
+          const available = [...byName.keys()].join(', ');
+          throw new Error(
+            `Skill "${skill}" not found. Available: ${available}`,
+          );
+        }
+        return `<skill name="${found.name}">\n${found.content}\n</skill>`;
+      },
+    });
+  }
+
   async createSession({ prompt }: { prompt: string }): Promise<Session> {
     const mcpToolGroups = await Promise.all(
       this.mcp.map((mcp) => mcp.connect()),
     );
-    const allTools = [...this.tools, ...mcpToolGroups.flat()];
+    const allTools = [
+      ...this.tools,
+      ...mcpToolGroups.flat(),
+      ...(this.skills.length > 0 ? [this.buildSkillTool()] : []),
+    ];
 
     try {
       const state: SessionState = {
