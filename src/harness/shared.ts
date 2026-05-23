@@ -184,6 +184,52 @@ const read = new Tool({
   },
 });
 
+type ExactReplacement = {
+  oldString: string;
+  newString: string;
+};
+
+async function applyExactReplacements(
+  filePath: string,
+  replacements: ExactReplacement[],
+): Promise<number> {
+  const content = await Bun.file(filePath).text();
+  const ranges = replacements.map(({ oldString, newString }) => {
+    const start = content.indexOf(oldString);
+    if (start === -1) {
+      throw new Error(`String not found in ${filePath}.`);
+    }
+    if (content.indexOf(oldString, start + oldString.length) !== -1) {
+      throw new Error(
+        `String is not unique in ${filePath}. Provide more context.`,
+      );
+    }
+    return { start, end: start + oldString.length, newString };
+  });
+
+  ranges.sort((a, b) => a.start - b.start);
+  for (let i = 1; i < ranges.length; i += 1) {
+    const previous = ranges[i - 1];
+    const current = ranges[i];
+    if (!previous || !current) continue;
+    if (current.start < previous.end) {
+      throw new Error(`Replacement ranges overlap in ${filePath}.`);
+    }
+  }
+
+  let updated = '';
+  let cursor = 0;
+  for (const range of ranges) {
+    updated += content.slice(cursor, range.start);
+    updated += range.newString;
+    cursor = range.end;
+  }
+  updated += content.slice(cursor);
+
+  await Bun.write(filePath, updated);
+  return ranges.length;
+}
+
 const edit = new Tool({
   name: 'Edit',
   description:
@@ -205,26 +251,15 @@ const edit = new Tool({
     new_string,
     replace_all,
   }): Promise<string> => {
-    const content = await Bun.file(file_path).text();
     if (replace_all) {
+      const content = await Bun.file(file_path).text();
       const updated = content.split(old_string).join(new_string);
       await Bun.write(file_path, updated);
       return `Edited ${file_path} (replace_all).`;
     }
-    const first = content.indexOf(old_string);
-    if (first === -1) {
-      throw new Error(`String not found in ${file_path}.`);
-    }
-    if (content.indexOf(old_string, first + old_string.length) !== -1) {
-      throw new Error(
-        `String is not unique in ${file_path}. Provide more context or set replace_all: true.`,
-      );
-    }
-    const updated =
-      content.slice(0, first) +
-      new_string +
-      content.slice(first + old_string.length);
-    await Bun.write(file_path, updated);
+    await applyExactReplacements(file_path, [
+      { oldString: old_string, newString: new_string },
+    ]);
     return `Edited ${file_path}.`;
   },
 });
@@ -866,6 +901,7 @@ const applyPatch = new Tool({
 
 export {
   applyPatch,
+  applyExactReplacements,
   bash,
   codexWebSearch,
   createTaskTools,
