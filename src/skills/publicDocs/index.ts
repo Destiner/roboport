@@ -1,6 +1,6 @@
 import { Skill } from '@/core';
 
-import content from './publicDocs.md' with { type: 'text' };
+import content from './index.md' with { type: 'text' };
 
 const publicDocs = new Skill({
   name: 'public-docs',

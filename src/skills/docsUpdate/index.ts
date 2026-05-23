@@ -1,6 +1,6 @@
 import { Skill } from '@/core';
 
-import content from './docsUpdate.md' with { type: 'text' };
+import content from './index.md' with { type: 'text' };
 
 const docsUpdate = new Skill({
   name: 'docs-update',

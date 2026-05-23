@@ -1,6 +1,6 @@
 import { Skill } from '@/core';
 
-import content from './prReview.md' with { type: 'text' };
+import content from './index.md' with { type: 'text' };
 
 const prReview = new Skill({
   name: 'pr-review',
