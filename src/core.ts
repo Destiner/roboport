@@ -1,4 +1,7 @@
-import type { z } from 'zod';
+import { z } from 'zod';
+
+import type { Message, ToolCallPart, ToolResultPart } from './message';
+import { createMessage } from './models/anthropic';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -63,6 +66,10 @@ class Skill {
   }
 }
 
+interface Session {
+  messages: Message[];
+}
+
 class Agent {
   model: Model;
   prompt: string;
@@ -85,6 +92,88 @@ class Agent {
     this.tools = tools;
     this.skills = skills;
   }
+
+  async createSession({ prompt }: { prompt: string }): Promise<Session> {
+    const apiKey = this.model.options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'No Anthropic API key found. Set ANTHROPIC_API_KEY or pass apiKey to Model.',
+      );
+    }
+
+    let system = this.prompt;
+    if (this.skills.length > 0) {
+      const skillsList = this.skills
+        .map((skill) => `- ${skill.name}: ${skill.description}`)
+        .join('\n');
+      system = `${system}\n\n# Skills available\n${skillsList}`;
+    }
+
+    const anthropicTools = this.tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: z.toJSONSchema(tool.inputSchema) as object,
+    }));
+
+    const toolByName = new Map(this.tools.map((tool) => [tool.name, tool]));
+
+    const messages: Message[] = [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ];
+
+    while (true) {
+      const response = await createMessage({
+        apiKey,
+        model: this.model.modelName,
+        messages,
+        tools: anthropicTools,
+      });
+
+      messages.push({ role: 'assistant', content: response.content });
+
+      if (response.stopReason !== 'tool_use') break;
+
+      const toolCalls = response.content.filter(
+        (block): block is ToolCallPart => block.type === 'tool-call',
+      );
+
+      const results: ToolResultPart[] = [];
+      for (const call of toolCalls) {
+        const tool = toolByName.get(call.toolName);
+        if (!tool) {
+          results.push({
+            type: 'tool-result',
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            output: `Error: tool "${call.toolName}" not found`,
+          });
+          continue;
+        }
+        try {
+          const parsed = tool.inputSchema.parse(call.input);
+          const output = await tool.execute(parsed);
+          results.push({
+            type: 'tool-result',
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            output,
+          });
+        } catch (error) {
+          results.push({
+            type: 'tool-result',
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            output: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+      }
+
+      messages.push({ role: 'tool', content: results });
+    }
+
+    return { messages };
+  }
 }
 
-export { Model, Tool, Skill, Agent };
+export { Model, Tool, Skill, Agent, type Session };
