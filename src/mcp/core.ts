@@ -1,5 +1,7 @@
 import { Tool, type McpClient } from '@/core';
 
+import type { AuthProvider } from './auth';
+
 type StdioTransportConfig = {
   type: 'stdio';
   command: string;
@@ -11,6 +13,7 @@ type HttpTransportConfig = {
   type: 'http';
   url: string;
   headers?: Record<string, string>;
+  auth?: AuthProvider;
 };
 
 type McpTransportConfig = StdioTransportConfig | HttpTransportConfig;
@@ -170,13 +173,16 @@ class HttpTransport implements Transport {
 
   async stop(): Promise<void> {}
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       ...(this.config.headers ?? {}),
     };
     if (this.sessionId) headers['mcp-session-id'] = this.sessionId;
+    if (this.config.auth) {
+      headers['authorization'] = await this.config.auth.getHeader();
+    }
     return headers;
   }
 
@@ -184,11 +190,28 @@ class HttpTransport implements Transport {
     body: JsonRpcRequest,
     expectId: number | undefined,
   ): Promise<unknown> {
-    const res = await fetch(this.config.url, {
+    const res = await this.attempt(body);
+    if (res.status === 401 && this.config.auth?.onUnauthorized) {
+      await res.body?.cancel();
+      await this.config.auth.onUnauthorized();
+      const retried = await this.attempt(body);
+      return this.consume(retried, expectId);
+    }
+    return this.consume(res, expectId);
+  }
+
+  private async attempt(body: JsonRpcRequest): Promise<Response> {
+    return fetch(this.config.url, {
       method: 'POST',
-      headers: this.buildHeaders(),
+      headers: await this.buildHeaders(),
       body: JSON.stringify(body),
     });
+  }
+
+  private async consume(
+    res: Response,
+    expectId: number | undefined,
+  ): Promise<unknown> {
     if (!res.ok) {
       throw new Error(`MCP HTTP error ${res.status}: ${await res.text()}`);
     }
