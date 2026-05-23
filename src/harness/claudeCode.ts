@@ -705,7 +705,7 @@ const toolSearch = new Tool({
     const { loaded, missing } = ctx.tools.load(names);
 
     const lines = loaded.map((tool) => {
-      const parameters = z.toJSONSchema(tool.inputSchema);
+      const parameters = tool.toJsonSchema();
       return `<function>${JSON.stringify({
         description: tool.description,
         name: tool.name,

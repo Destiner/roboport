@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import {
   Model,
   type CreateMessageParams,
@@ -116,7 +114,7 @@ class AnthropicModel extends Model {
     const wireTools = tools?.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: z.toJSONSchema(tool.inputSchema) as object,
+      input_schema: tool.toJsonSchema(),
     }));
 
     const body: Record<string, unknown> = {

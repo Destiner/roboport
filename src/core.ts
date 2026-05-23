@@ -67,34 +67,70 @@ abstract class Model {
   abstract searchWeb(query: string, opts?: SearchOptions): Promise<SearchHit[]>;
 }
 
-class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
+interface McpClient {
+  connect(): Promise<Tool[]>;
+  disconnect(): Promise<void>;
+}
+
+type ZodToolInit<TSchema extends z.ZodTypeAny, TResult> = {
   name: string;
   description: string;
   inputSchema: TSchema;
   execute: (input: z.infer<TSchema>, ctx: ToolContext) => MaybePromise<TResult>;
+  deferred?: boolean;
+};
+
+type RawToolInit<TResult> = {
+  name: string;
+  description: string;
+  jsonSchema: object;
+  execute: (input: unknown, ctx: ToolContext) => MaybePromise<TResult>;
+  deferred?: boolean;
+};
+
+type ToolInit<TSchema extends z.ZodTypeAny, TResult> =
+  | ZodToolInit<TSchema, TResult>
+  | RawToolInit<TResult>;
+
+class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
+  name: string;
+  description: string;
+  inputSchema?: TSchema;
+  jsonSchema?: object;
+  execute: (input: unknown, ctx: ToolContext) => MaybePromise<TResult>;
   deferred: boolean;
 
-  constructor({
-    name,
-    description,
-    inputSchema,
-    execute,
-    deferred,
-  }: {
-    name: string;
-    description: string;
-    inputSchema: TSchema;
-    execute: (
-      input: z.infer<TSchema>,
-      ctx: ToolContext,
-    ) => MaybePromise<TResult>;
-    deferred?: boolean;
-  }) {
-    this.name = name;
-    this.description = description;
-    this.inputSchema = inputSchema;
-    this.execute = execute;
-    this.deferred = deferred ?? false;
+  constructor(init: ZodToolInit<TSchema, TResult>);
+  constructor(init: RawToolInit<TResult>);
+  constructor(init: ToolInit<TSchema, TResult>) {
+    this.name = init.name;
+    this.description = init.description;
+    this.deferred = init.deferred ?? false;
+    if ('inputSchema' in init) {
+      this.inputSchema = init.inputSchema;
+      this.execute = init.execute as (
+        input: unknown,
+        ctx: ToolContext,
+      ) => MaybePromise<TResult>;
+    } else {
+      this.jsonSchema = init.jsonSchema;
+      this.execute = init.execute;
+    }
+  }
+
+  toJsonSchema(): object {
+    if (this.jsonSchema !== undefined) return this.jsonSchema;
+    if (this.inputSchema === undefined) {
+      throw new Error(
+        `Tool "${this.name}" has neither inputSchema nor jsonSchema.`,
+      );
+    }
+    return z.toJSONSchema(this.inputSchema) as object;
+  }
+
+  parse(input: unknown): unknown {
+    if (this.inputSchema) return this.inputSchema.parse(input);
+    return input;
   }
 }
 
@@ -154,25 +190,29 @@ class Agent {
   prompt: string;
   tools: Tool[];
   skills: Skill[];
+  mcp: McpClient[];
 
   constructor({
     model,
     prompt,
     tools,
     skills,
+    mcp,
   }: {
     model: Model;
     prompt: string;
     tools: Tool[];
     skills: Skill[];
+    mcp?: McpClient[];
   }) {
     this.model = model;
     this.prompt = prompt;
     this.tools = tools;
     this.skills = skills;
+    this.mcp = mcp ?? [];
   }
 
-  buildSystem(): string {
+  buildSystem(allTools: Tool[]): string {
     let system = this.prompt;
     if (this.skills.length > 0) {
       const skillsList = this.skills
@@ -180,7 +220,7 @@ class Agent {
         .join('\n');
       system = `${system}\n\n# Skills available\n${skillsList}`;
     }
-    const deferred = this.tools.filter((tool) => tool.deferred);
+    const deferred = allTools.filter((tool) => tool.deferred);
     if (deferred.length > 0) {
       const list = deferred.map((tool) => `- ${tool.name}`).join('\n');
       system = `${system}\n\n# Deferred tools\nThese tools are available but their schemas are not loaded. Use ToolSearch to load them before calling.\n${list}`;
@@ -189,83 +229,92 @@ class Agent {
   }
 
   async createSession({ prompt }: { prompt: string }): Promise<Session> {
-    const state: SessionState = {
-      messages: [
-        { role: 'system', content: this.buildSystem() },
-        { role: 'user', content: prompt },
-      ],
-      store: new Map(),
-    };
+    const mcpToolGroups = await Promise.all(
+      this.mcp.map((mcp) => mcp.connect()),
+    );
+    const allTools = [...this.tools, ...mcpToolGroups.flat()];
 
-    const registry = createRegistry(this.tools);
+    try {
+      const state: SessionState = {
+        messages: [
+          { role: 'system', content: this.buildSystem(allTools) },
+          { role: 'user', content: prompt },
+        ],
+        store: new Map(),
+      };
 
-    const ctx: ToolContext = {
-      complete: async (p: string): Promise<string> => {
+      const registry = createRegistry(allTools);
+
+      const ctx: ToolContext = {
+        complete: async (p: string): Promise<string> => {
+          const response = await this.model.createMessage({
+            messages: [{ role: 'user', content: p }],
+          });
+          return response.content
+            .filter((block): block is TextPart => block.type === 'text')
+            .map((block) => block.text)
+            .join('\n');
+        },
+        searchWeb: (query, opts) => this.model.searchWeb(query, opts),
+        session: state,
+        tools: registry,
+      };
+
+      while (true) {
+        const active = registry.loaded();
+        const toolByName = new Map(active.map((tool) => [tool.name, tool]));
+
         const response = await this.model.createMessage({
-          messages: [{ role: 'user', content: p }],
+          messages: state.messages,
+          tools: active,
         });
-        return response.content
-          .filter((block): block is TextPart => block.type === 'text')
-          .map((block) => block.text)
-          .join('\n');
-      },
-      searchWeb: (query, opts) => this.model.searchWeb(query, opts),
-      session: state,
-      tools: registry,
-    };
 
-    while (true) {
-      const active = registry.loaded();
-      const toolByName = new Map(active.map((tool) => [tool.name, tool]));
+        state.messages.push({ role: 'assistant', content: response.content });
 
-      const response = await this.model.createMessage({
-        messages: state.messages,
-        tools: active,
-      });
+        if (response.stopReason !== 'tool_use') break;
 
-      state.messages.push({ role: 'assistant', content: response.content });
+        const toolCalls = response.content.filter(
+          (block): block is ToolCallPart => block.type === 'tool-call',
+        );
 
-      if (response.stopReason !== 'tool_use') break;
-
-      const toolCalls = response.content.filter(
-        (block): block is ToolCallPart => block.type === 'tool-call',
-      );
-
-      const results: ToolResultPart[] = [];
-      for (const call of toolCalls) {
-        const tool = toolByName.get(call.toolName);
-        if (!tool) {
-          results.push({
-            type: 'tool-result',
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            output: `Error: tool "${call.toolName}" not found`,
-          });
-          continue;
+        const results: ToolResultPart[] = [];
+        for (const call of toolCalls) {
+          const tool = toolByName.get(call.toolName);
+          if (!tool) {
+            results.push({
+              type: 'tool-result',
+              toolCallId: call.toolCallId,
+              toolName: call.toolName,
+              output: `Error: tool "${call.toolName}" not found`,
+            });
+            continue;
+          }
+          try {
+            const parsed = tool.parse(call.input);
+            const output = await tool.execute(parsed, ctx);
+            results.push({
+              type: 'tool-result',
+              toolCallId: call.toolCallId,
+              toolName: call.toolName,
+              output,
+            });
+          } catch (error) {
+            results.push({
+              type: 'tool-result',
+              toolCallId: call.toolCallId,
+              toolName: call.toolName,
+              output: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            });
+          }
         }
-        try {
-          const parsed = tool.inputSchema.parse(call.input);
-          const output = await tool.execute(parsed, ctx);
-          results.push({
-            type: 'tool-result',
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            output,
-          });
-        } catch (error) {
-          results.push({
-            type: 'tool-result',
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            output: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
+
+        state.messages.push({ role: 'tool', content: results });
       }
 
-      state.messages.push({ role: 'tool', content: results });
+      return { messages: state.messages };
+    } finally {
+      await Promise.all(this.mcp.map((mcp) => mcp.disconnect()));
     }
-
-    return { messages: state.messages };
   }
 }
 
@@ -283,4 +332,5 @@ export {
   type CreateMessageParams,
   type CreateMessageResponse,
   type StopReason,
+  type McpClient,
 };
