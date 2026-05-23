@@ -1,6 +1,6 @@
 import { Skill } from '@/core';
 
-import content from './index.md' with { type: 'text' };
+import content from './SKILL.md' with { type: 'text' };
 
 const developerExperience = new Skill({
   name: 'developer-experience',

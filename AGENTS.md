@@ -24,7 +24,7 @@ No test suite yet.
 - `src/models/` - `Model` adapters (Anthropic, OpenAI, OpenAI-compatible, Moonshot)
 - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
 - `src/harness/` - `Harness` bundle and Claude Code preset
-- `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`); each skill is a directory with `index.ts` + `index.md`, the body imported with `with { type: 'text' }`
+- `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`); each skill is a directory with `index.ts` + `SKILL.md`, the body imported with `with { type: 'text' }`
 
 ## Patterns
 
