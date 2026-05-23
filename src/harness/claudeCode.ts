@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { Tool } from '@/core';
+import { Tool, type ToolContext } from '@/core';
 
 import { Harness } from './core';
 
@@ -434,7 +434,23 @@ const webFetch = new Tool({
     url: z.url().describe('The URL to fetch content from.'),
     prompt: z.string().describe('The prompt to run on the fetched content.'),
   }),
-  execute: notImplemented('WebFetch'),
+  deferred: true,
+  execute: async ({ url, prompt }, ctx): Promise<string> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+    const body = await response.text();
+    const cleaned = body
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return ctx.complete(
+      `${prompt}\n\n---\n\nContent from ${url}:\n\n${cleaned}`,
+    );
+  },
 });
 
 const webSearch = new Tool({
@@ -452,7 +468,21 @@ const webSearch = new Tool({
       .optional()
       .describe('Never include search results from these domains.'),
   }),
-  execute: notImplemented('WebSearch'),
+  deferred: true,
+  execute: async (
+    { query, allowed_domains, blocked_domains },
+    ctx,
+  ): Promise<unknown> => {
+    if (!ctx.config.search) {
+      throw new Error(
+        'WebSearch requires a search provider. Pass `config.search` to the Agent.',
+      );
+    }
+    return ctx.config.search.search(query, {
+      allowed_domains,
+      blocked_domains,
+    });
+  },
 });
 
 const agent = new Tool({
@@ -479,6 +509,7 @@ const agent = new Tool({
       .optional()
       .describe('Set to true to run this agent in the background.'),
   }),
+  deferred: true,
   execute: notImplemented('Agent'),
 });
 
@@ -493,8 +524,30 @@ const exitPlanMode = new Tool({
         'The plan to run by the user for approval. Concise markdown is fine.',
       ),
   }),
+  deferred: true,
   execute: notImplemented('ExitPlanMode'),
 });
+
+interface Task {
+  id: string;
+  subject: string;
+  description: string;
+  activeForm?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
+  blocks: string[];
+  blockedBy: string[];
+  metadata?: Record<string, unknown>;
+}
+
+const TASKS_KEY = 'claudeCode.tasks';
+
+function getTasks(ctx: ToolContext): Task[] {
+  return (ctx.session.store.get(TASKS_KEY) as Task[] | undefined) ?? [];
+}
+
+function setTasks(ctx: ToolContext, tasks: Task[]): void {
+  ctx.session.store.set(TASKS_KEY, tasks);
+}
 
 const taskCreate = new Tool({
   name: 'TaskCreate',
@@ -516,7 +569,21 @@ const taskCreate = new Tool({
       .optional()
       .describe('Arbitrary metadata to attach to the task.'),
   }),
-  execute: notImplemented('TaskCreate'),
+  deferred: true,
+  execute: (input, ctx): Task => {
+    const task: Task = {
+      id: crypto.randomUUID(),
+      subject: input.subject,
+      description: input.description,
+      activeForm: input.activeForm,
+      status: 'pending',
+      blocks: [],
+      blockedBy: [],
+      metadata: input.metadata,
+    };
+    setTasks(ctx, [...getTasks(ctx), task]);
+    return task;
+  },
 });
 
 const taskUpdate = new Tool({
@@ -532,19 +599,48 @@ const taskUpdate = new Tool({
     subject: z.string().optional(),
     description: z.string().optional(),
     activeForm: z.string().optional(),
-    owner: z.string().optional(),
     addBlocks: z.array(z.string()).optional(),
     addBlockedBy: z.array(z.string()).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   }),
-  execute: notImplemented('TaskUpdate'),
+  deferred: true,
+  execute: (input, ctx): Task => {
+    const tasks = getTasks(ctx);
+    const idx = tasks.findIndex((task) => task.id === input.taskId);
+    if (idx === -1) {
+      throw new Error(`Task ${input.taskId} not found.`);
+    }
+    const prev = tasks[idx];
+    if (!prev) {
+      throw new Error(`Task ${input.taskId} not found.`);
+    }
+    const next: Task = {
+      ...prev,
+      status: input.status ?? prev.status,
+      subject: input.subject ?? prev.subject,
+      description: input.description ?? prev.description,
+      activeForm: input.activeForm ?? prev.activeForm,
+      blocks: input.addBlocks
+        ? [...prev.blocks, ...input.addBlocks]
+        : prev.blocks,
+      blockedBy: input.addBlockedBy
+        ? [...prev.blockedBy, ...input.addBlockedBy]
+        : prev.blockedBy,
+      metadata: input.metadata ?? prev.metadata,
+    };
+    const updated = [...tasks];
+    updated[idx] = next;
+    setTasks(ctx, updated);
+    return next;
+  },
 });
 
 const taskList = new Tool({
   name: 'TaskList',
   description: 'List tasks in the current session task list.',
   inputSchema: z.object({}),
-  execute: notImplemented('TaskList'),
+  deferred: true,
+  execute: (_input, ctx): Task[] => getTasks(ctx),
 });
 
 const taskGet = new Tool({
@@ -553,7 +649,82 @@ const taskGet = new Tool({
   inputSchema: z.object({
     taskId: z.string().describe('The ID of the task to fetch.'),
   }),
-  execute: notImplemented('TaskGet'),
+  deferred: true,
+  execute: (input, ctx): Task => {
+    const task = getTasks(ctx).find((t) => t.id === input.taskId);
+    if (!task) {
+      throw new Error(`Task ${input.taskId} not found.`);
+    }
+    return task;
+  },
+});
+
+const toolSearch = new Tool({
+  name: 'ToolSearch',
+  description:
+    'Fetches full schema definitions for deferred tools so they can be called. Use query "select:<name>[,<name>...]" for direct selection, or keywords to search by name/description.',
+  inputSchema: z.object({
+    query: z
+      .string()
+      .describe(
+        'Query to find deferred tools. Use "select:<tool_name>" for direct selection, or keywords to search.',
+      ),
+    max_results: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Maximum number of results to return (default: 5).'),
+  }),
+  execute: ({ query, max_results }, ctx): string => {
+    const max = max_results ?? 5;
+    const deferred = ctx.tools.deferred();
+
+    let names: string[];
+    if (query.startsWith('select:')) {
+      names = query
+        .slice('select:'.length)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } else {
+      const terms = query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => (t.startsWith('+') ? t.slice(1) : t));
+      const scored = deferred
+        .map((tool) => {
+          const haystack = `${tool.name} ${tool.description}`.toLowerCase();
+          const score = terms.reduce(
+            (acc, term) => acc + (haystack.includes(term) ? 1 : 0),
+            0,
+          );
+          return { tool, score };
+        })
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, max);
+      names = scored.map(({ tool }) => tool.name);
+    }
+
+    const { loaded, missing } = ctx.tools.load(names);
+
+    const lines = loaded.map((tool) => {
+      const parameters = z.toJSONSchema(tool.inputSchema);
+      return `<function>${JSON.stringify({
+        description: tool.description,
+        name: tool.name,
+        parameters,
+      })}</function>`;
+    });
+
+    const parts = [`<functions>\n${lines.join('\n')}\n</functions>`];
+    if (missing.length > 0) {
+      parts.push(`Not found: ${missing.join(', ')}`);
+    }
+    return parts.join('\n\n');
+  },
 });
 
 const tools: Tool[] = [
@@ -571,6 +742,7 @@ const tools: Tool[] = [
   taskUpdate,
   taskList,
   taskGet,
+  toolSearch,
 ];
 
 const harness = new Harness(system, tools);

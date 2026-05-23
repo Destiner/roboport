@@ -1,4 +1,16 @@
-import { Model, Tool, Skill, Agent, type Session } from './core';
+import {
+  Model,
+  Tool,
+  Skill,
+  Agent,
+  type Session,
+  type SessionState,
+  type ToolContext,
+  type ToolRegistry,
+  type AgentConfig,
+  type SearchProvider,
+  type SearchHit,
+} from './core';
 import type {
   Message,
   TextPart,
@@ -12,6 +24,12 @@ export {
   Skill,
   Agent,
   type Session,
+  type SessionState,
+  type ToolContext,
+  type ToolRegistry,
+  type AgentConfig,
+  type SearchProvider,
+  type SearchHit,
   type Message,
   type TextPart,
   type ToolCallPart,
