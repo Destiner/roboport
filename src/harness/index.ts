@@ -1,4 +1,4 @@
+import claudeCode from './claudeCode';
 import { Harness } from './core';
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { Harness };
+export { Harness, claudeCode };

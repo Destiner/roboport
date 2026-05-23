@@ -1,3 +1,7 @@
+import type { z } from 'zod';
+
+type MaybePromise<T> = T | Promise<T>;
+
 class Model {
   modelName: string;
   options: {
@@ -15,23 +19,27 @@ class Model {
   }
 }
 
-class Tool {
+class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
   name: string;
   description: string;
-  func: () => void;
+  inputSchema: TSchema;
+  execute: (input: z.infer<TSchema>) => MaybePromise<TResult>;
 
   constructor({
     name,
     description,
-    func,
+    inputSchema,
+    execute,
   }: {
     name: string;
     description: string;
-    func: () => void;
+    inputSchema: TSchema;
+    execute: (input: z.infer<TSchema>) => MaybePromise<TResult>;
   }) {
     this.name = name;
     this.description = description;
-    this.func = func;
+    this.inputSchema = inputSchema;
+    this.execute = execute;
   }
 }
 
