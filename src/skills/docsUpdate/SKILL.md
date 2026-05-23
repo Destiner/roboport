@@ -1,8 +1,13 @@
+---
+name: docs-update
+description: Keeps a repo's internal docs (README.md, AGENTS.md / CLAUDE.md, docs/**/*.md) in sync with a code change. Routes each fact to one canonical home, preserves the existing voice, and skips trivial changes. Use after a PR-sized change set when public API, commands, structure, or stack claims may have shifted.
+---
+
 # Docs update
 
 Keep a repo's *internal* docs (`README.md`, `AGENTS.md` / `CLAUDE.md`, `docs/**/*.md`) in sync with a code change. Surgical edits, one canonical home per fact, matched voice.
 
-Out of scope: public/user-facing docs sites (Mintlify, Docusaurus, API reference), changelogs, release notes. Use other skills for those.
+Out of scope: public/user-facing docs sites (Mintlify, Docusaurus, API reference), changelogs, release notes.
 
 ## When this runs
 

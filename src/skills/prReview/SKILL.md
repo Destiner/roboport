@@ -1,3 +1,8 @@
+---
+name: pr-review
+description: Reviews a pull request or branch diff and produces a short, severity-tiered report (must-fix / should-consider / nits) with a final verdict. Use when the user asks to review a PR, review their branch, look at someone else's PR, or mentions a PR number / URL.
+---
+
 # PR review
 
 Review a pull request or branch diff for blocking issues before it merges. The output is a short, severity-tiered report — not a checklist run.

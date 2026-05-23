@@ -1,8 +1,13 @@
+---
+name: public-docs
+description: Writes and maintains external, user-facing docs for an SDK / API / product, run from a docs repo with upstream source repos as context. Classifies each page as quickstart / concept / how-to / reference / recipe, prefers generated shape with hand-written meaning, and avoids duplication with the SDK README. Use when working in a docs repo (Mintlify, Docusaurus, or plain markdown) or when the user asks to write or refresh public/user-facing docs.
+---
+
 # Public docs
 
 Write and maintain external, user-facing docs for an SDK, API, or product. This skill runs from a docs repo and treats upstream code repos (SDK source, backend, OpenAPI spec) as context.
 
-Out of scope: internal README / `AGENTS.md` for the docs repo itself (use `docs-update`), changelogs, marketing copy.
+Out of scope: the docs repo's own internal README / `AGENTS.md`, changelogs, marketing copy.
 
 ## First, orient
 
