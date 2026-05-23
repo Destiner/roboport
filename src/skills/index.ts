@@ -1,5 +1,6 @@
 import { Skill } from '@/core';
 
+import codeSimplifierRaw from './codeSimplifier/SKILL.md' with { type: 'text' };
 import developerExperienceRaw from './developerExperience/SKILL.md' with { type: 'text' };
 import docsUpdateRaw from './docsUpdate/SKILL.md' with { type: 'text' };
 import prReviewRaw from './prReview/SKILL.md' with { type: 'text' };
@@ -31,5 +32,12 @@ const prReview = parseSkill(prReviewRaw);
 const docsUpdate = parseSkill(docsUpdateRaw);
 const publicDocs = parseSkill(publicDocsRaw);
 const developerExperience = parseSkill(developerExperienceRaw);
+const codeSimplifier = parseSkill(codeSimplifierRaw);
 
-export { prReview, docsUpdate, publicDocs, developerExperience };
+export {
+  prReview,
+  docsUpdate,
+  publicDocs,
+  developerExperience,
+  codeSimplifier,
+};
