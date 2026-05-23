@@ -2,7 +2,9 @@
 
 > Agents as Code
 
-Minimal framework for building LLM agents. Composable primitives (`Agent`, `Model`, `Tool`, `Skill`). Pluggable model providers and MCP clients.
+Minimal framework for building agents.
+
+Composable primitives with sane defaults. Bring your own models, tools, skills; or just use the built-ins.
 
 ```ts
 import { Agent, Skill } from '@/core';
@@ -46,8 +48,6 @@ bun run lint
 bun run typecheck
 ```
 
-Requires [Bun](https://bun.sh).
-
 ## Status
 
-Early. APIs will change.
+Early. Experimental. APIs will change.
