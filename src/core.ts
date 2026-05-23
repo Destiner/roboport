@@ -6,9 +6,16 @@ import type {
   ToolCallPart,
   ToolResultPart,
 } from './message';
-import { createMessage } from './models/anthropic';
 
 type MaybePromise<T> = T | Promise<T>;
+
+type StopReason =
+  | 'end_turn'
+  | 'tool_use'
+  | 'max_tokens'
+  | 'stop_sequence'
+  | 'pause_turn'
+  | 'refusal';
 
 interface SessionState {
   messages: Message[];
@@ -24,42 +31,40 @@ interface ToolRegistry {
 interface SearchHit {
   title: string;
   url: string;
-  snippet: string;
+  pageAge?: string;
 }
 
-interface SearchProvider {
-  search(
-    query: string,
-    opts?: { allowed_domains?: string[]; blocked_domains?: string[] },
-  ): Promise<SearchHit[]>;
+interface SearchOptions {
+  allowedDomains?: string[];
+  blockedDomains?: string[];
+  maxUses?: number;
 }
 
-interface AgentConfig {
-  search?: SearchProvider;
+interface CreateMessageParams {
+  messages: Message[];
+  tools?: Tool[];
+  maxTokens?: number;
+}
+
+interface CreateMessageResponse {
+  id: string;
+  content: (TextPart | ToolCallPart)[];
+  stopReason: StopReason;
+  usage: { inputTokens: number; outputTokens: number };
 }
 
 interface ToolContext {
   complete(prompt: string): Promise<string>;
+  searchWeb(query: string, opts?: SearchOptions): Promise<SearchHit[]>;
   session: SessionState;
   tools: ToolRegistry;
-  config: AgentConfig;
 }
 
-class Model {
-  modelName: string;
-  options: {
-    apiKey?: string;
-  };
-
-  constructor(
-    modelName: string,
-    options?: {
-      apiKey?: string;
-    },
-  ) {
-    this.modelName = modelName;
-    this.options = options || {};
-  }
+abstract class Model {
+  abstract createMessage(
+    params: CreateMessageParams,
+  ): Promise<CreateMessageResponse>;
+  abstract searchWeb(query: string, opts?: SearchOptions): Promise<SearchHit[]>;
 }
 
 class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
@@ -149,26 +154,22 @@ class Agent {
   prompt: string;
   tools: Tool[];
   skills: Skill[];
-  config: AgentConfig;
 
   constructor({
     model,
     prompt,
     tools,
     skills,
-    config,
   }: {
     model: Model;
     prompt: string;
     tools: Tool[];
     skills: Skill[];
-    config?: AgentConfig;
   }) {
     this.model = model;
     this.prompt = prompt;
     this.tools = tools;
     this.skills = skills;
-    this.config = config ?? {};
   }
 
   buildSystem(): string {
@@ -188,13 +189,6 @@ class Agent {
   }
 
   async createSession({ prompt }: { prompt: string }): Promise<Session> {
-    const apiKey = this.model.options.apiKey ?? process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        'No Anthropic API key found. Set ANTHROPIC_API_KEY or pass apiKey to Model.',
-      );
-    }
-
     const state: SessionState = {
       messages: [
         { role: 'system', content: this.buildSystem() },
@@ -207,9 +201,7 @@ class Agent {
 
     const ctx: ToolContext = {
       complete: async (p: string): Promise<string> => {
-        const response = await createMessage({
-          apiKey,
-          model: this.model.modelName,
+        const response = await this.model.createMessage({
           messages: [{ role: 'user', content: p }],
         });
         return response.content
@@ -217,25 +209,18 @@ class Agent {
           .map((block) => block.text)
           .join('\n');
       },
+      searchWeb: (query, opts) => this.model.searchWeb(query, opts),
       session: state,
       tools: registry,
-      config: this.config,
     };
 
     while (true) {
       const active = registry.loaded();
-      const anthropicTools = active.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        input_schema: z.toJSONSchema(tool.inputSchema) as object,
-      }));
       const toolByName = new Map(active.map((tool) => [tool.name, tool]));
 
-      const response = await createMessage({
-        apiKey,
-        model: this.model.modelName,
+      const response = await this.model.createMessage({
         messages: state.messages,
-        tools: anthropicTools,
+        tools: active,
       });
 
       state.messages.push({ role: 'assistant', content: response.content });
@@ -293,7 +278,9 @@ export {
   type SessionState,
   type ToolContext,
   type ToolRegistry,
-  type AgentConfig,
-  type SearchProvider,
   type SearchHit,
+  type SearchOptions,
+  type CreateMessageParams,
+  type CreateMessageResponse,
+  type StopReason,
 };

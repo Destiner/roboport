@@ -1,18 +1,14 @@
+import { z } from 'zod';
+
+import {
+  Model,
+  type CreateMessageParams,
+  type CreateMessageResponse,
+  type SearchHit,
+  type SearchOptions,
+  type StopReason,
+} from '@/core';
 import type { Message, TextPart, ToolCallPart } from '@/message';
-
-type StopReason =
-  | 'end_turn'
-  | 'tool_use'
-  | 'max_tokens'
-  | 'stop_sequence'
-  | 'pause_turn'
-  | 'refusal';
-
-interface AnthropicTool {
-  name: string;
-  description: string;
-  input_schema: object;
-}
 
 type AnthropicWireContent =
   | { type: 'text'; text: string }
@@ -29,19 +25,12 @@ interface AnthropicWireMessage {
   content: AnthropicWireContent[];
 }
 
-interface CreateMessageParams {
-  apiKey: string;
-  model: string;
-  messages: Message[];
-  tools?: AnthropicTool[];
-  maxTokens?: number;
-}
-
-interface CreateMessageResponse {
-  id: string;
-  content: (TextPart | ToolCallPart)[];
-  stopReason: StopReason;
-  usage: { inputTokens: number; outputTokens: number };
+interface WebSearchResultBlock {
+  type: 'web_search_result';
+  url: string;
+  title: string;
+  page_age?: string | null;
+  encrypted_content?: string;
 }
 
 function serializeToolOutput(output: unknown): string {
@@ -89,7 +78,6 @@ function toWire(messages: Message[]): {
       continue;
     }
 
-    // role === 'tool' — Anthropic packs tool results inside a user message
     wireMessages.push({
       role: 'user',
       content: msg.content.map((part) => ({
@@ -103,71 +91,145 @@ function toWire(messages: Message[]): {
   return { system, wireMessages };
 }
 
-async function createMessage(
-  params: CreateMessageParams,
-): Promise<CreateMessageResponse> {
-  const { apiKey, model, messages, tools, maxTokens = 8192 } = params;
-  const { system, wireMessages } = toWire(messages);
+class AnthropicModel extends Model {
+  modelName: string;
+  apiKey: string;
 
-  const body: Record<string, unknown> = {
-    model,
-    max_tokens: maxTokens,
-    messages: wireMessages,
-  };
-  if (system !== undefined) body.system = system;
-  if (tools !== undefined && tools.length > 0) body.tools = tools;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+  constructor(modelName: string, options?: { apiKey?: string }) {
+    super();
+    this.modelName = modelName;
+    const key = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (!key) {
+      throw new Error(
+        'No Anthropic API key found. Set ANTHROPIC_API_KEY or pass apiKey.',
+      );
+    }
+    this.apiKey = key;
   }
 
-  const json = (await response.json()) as {
-    id: string;
-    content: AnthropicWireContent[];
-    stop_reason: StopReason;
-    usage: { input_tokens: number; output_tokens: number };
-  };
+  override async createMessage(
+    params: CreateMessageParams,
+  ): Promise<CreateMessageResponse> {
+    const { messages, tools, maxTokens = 8192 } = params;
+    const { system, wireMessages } = toWire(messages);
 
-  const content: (TextPart | ToolCallPart)[] = json.content.map((block) => {
-    if (block.type === 'text') {
-      return { type: 'text', text: block.text };
-    }
-    if (block.type === 'tool_use') {
-      return {
-        type: 'tool-call',
-        toolCallId: block.id,
-        toolName: block.name,
-        input: block.input,
-      };
-    }
-    throw new Error(`Unexpected content block from Anthropic: ${block.type}`);
-  });
+    const wireTools = tools?.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: z.toJSONSchema(tool.inputSchema) as object,
+    }));
 
-  return {
-    id: json.id,
-    content,
-    stopReason: json.stop_reason,
-    usage: {
-      inputTokens: json.usage.input_tokens,
-      outputTokens: json.usage.output_tokens,
-    },
-  };
+    const body: Record<string, unknown> = {
+      model: this.modelName,
+      max_tokens: maxTokens,
+      messages: wireMessages,
+    };
+    if (system !== undefined) body.system = system;
+    if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Anthropic API error ${response.status}: ${await response.text()}`,
+      );
+    }
+
+    const json = (await response.json()) as {
+      id: string;
+      content: AnthropicWireContent[];
+      stop_reason: StopReason;
+      usage: { input_tokens: number; output_tokens: number };
+    };
+
+    const content: (TextPart | ToolCallPart)[] = json.content.map((block) => {
+      if (block.type === 'text') {
+        return { type: 'text', text: block.text };
+      }
+      if (block.type === 'tool_use') {
+        return {
+          type: 'tool-call',
+          toolCallId: block.id,
+          toolName: block.name,
+          input: block.input,
+        };
+      }
+      throw new Error(`Unexpected content block from Anthropic: ${block.type}`);
+    });
+
+    return {
+      id: json.id,
+      content,
+      stopReason: json.stop_reason,
+      usage: {
+        inputTokens: json.usage.input_tokens,
+        outputTokens: json.usage.output_tokens,
+      },
+    };
+  }
+
+  override async searchWeb(
+    query: string,
+    opts?: SearchOptions,
+  ): Promise<SearchHit[]> {
+    const tool: Record<string, unknown> = {
+      type: 'web_search_20250305',
+      name: 'web_search',
+    };
+    if (opts?.allowedDomains) tool.allowed_domains = opts.allowedDomains;
+    if (opts?.blockedDomains) tool.blocked_domains = opts.blockedDomains;
+    if (opts?.maxUses !== undefined) tool.max_uses = opts.maxUses;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.modelName,
+        max_tokens: 1024,
+        tools: [tool],
+        messages: [{ role: 'user', content: `Search the web for: ${query}` }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Anthropic web_search failed (${response.status}): ${await response.text()}`,
+      );
+    }
+
+    const json = (await response.json()) as {
+      content: ({ type: string } & Record<string, unknown>)[];
+    };
+
+    const hits: SearchHit[] = [];
+    for (const block of json.content) {
+      if (block.type !== 'web_search_tool_result') continue;
+      const content = block.content as WebSearchResultBlock[] | undefined;
+      if (!Array.isArray(content)) continue;
+      for (const item of content) {
+        if (item.type !== 'web_search_result') continue;
+        hits.push({
+          title: item.title,
+          url: item.url,
+          pageAge: item.page_age ?? undefined,
+        });
+      }
+    }
+    return hits;
+  }
 }
 
-export {
-  type AnthropicTool,
-  type CreateMessageParams,
-  type CreateMessageResponse,
-  createMessage,
-};
+// eslint-disable-next-line import-x/prefer-default-export
+export { AnthropicModel };

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { Tool, type ToolContext } from '@/core';
+import { Tool, type SearchHit, type ToolContext } from '@/core';
 
 import { Harness } from './core';
 
@@ -469,20 +469,14 @@ const webSearch = new Tool({
       .describe('Never include search results from these domains.'),
   }),
   deferred: true,
-  execute: async (
+  execute: (
     { query, allowed_domains, blocked_domains },
     ctx,
-  ): Promise<unknown> => {
-    if (!ctx.config.search) {
-      throw new Error(
-        'WebSearch requires a search provider. Pass `config.search` to the Agent.',
-      );
-    }
-    return ctx.config.search.search(query, {
-      allowed_domains,
-      blocked_domains,
-    });
-  },
+  ): Promise<SearchHit[]> =>
+    ctx.searchWeb(query, {
+      allowedDomains: allowed_domains,
+      blockedDomains: blocked_domains,
+    }),
 });
 
 const agent = new Tool({

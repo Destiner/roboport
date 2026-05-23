@@ -7,9 +7,8 @@ import {
   type SessionState,
   type ToolContext,
   type ToolRegistry,
-  type AgentConfig,
-  type SearchProvider,
   type SearchHit,
+  type SearchOptions,
 } from './core';
 import type {
   Message,
@@ -27,9 +26,8 @@ export {
   type SessionState,
   type ToolContext,
   type ToolRegistry,
-  type AgentConfig,
-  type SearchProvider,
   type SearchHit,
+  type SearchOptions,
   type Message,
   type TextPart,
   type ToolCallPart,
