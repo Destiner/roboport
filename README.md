@@ -1,6 +1,8 @@
-# drone
+# Drone
 
-A small TypeScript framework for building LLM agents. Composable primitives — `Agent`, `Model`, `Tool`, `Skill` — with first-class MCP and pluggable model providers (Anthropic, OpenAI, OpenAI-compatible, Moonshot).
+> Agents as Code
+
+Minimal framework for building LLM agents. Composable primitives (`Agent`, `Model`, `Tool`, `Skill`). Pluggable model providers and MCP clients.
 
 ```ts
 import { Agent, Skill } from '@/core';
