@@ -11,6 +11,7 @@ import { Agent, Skill } from '@/core';
 import { claudeCode } from '@/harness';
 import { AnthropicModel } from '@/models';
 import { grafanaMcp, linearMcp } from '@/mcp';
+import { grafanaTrigger } from '@/triggers';
 
 const incidentTriage = new Skill({
   name: 'incident-triage',
@@ -32,12 +33,16 @@ const agent = new Agent({
   ],
 });
 
-agent.on('grafana:alert', (alert) => {
-  if (alert.isResolved) return;
-  agent.createSession({
-    prompt: `Triage Grafana alert ${alert.id} and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
-  });
+const grafana = grafanaTrigger();
+agent.on(grafana.alert({ status: 'firing' }), {
+  prompt: (alert) =>
+    `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
 });
+
+await agent.start();
+
+// Mount the Grafana receiver on your HTTP server of choice
+Bun.serve({ port: 8080, fetch: (req) => grafana.handle(req) });
 ```
 
 ## Scripts

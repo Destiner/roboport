@@ -6,6 +6,7 @@ import type {
   ToolCallPart,
   ToolResultPart,
 } from './message';
+import type { Subscription, Trigger, Unsub } from './triggers/core';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -185,12 +186,19 @@ function createRegistry(tools: Tool[]): ToolRegistry {
   };
 }
 
+interface Registration<T = unknown> {
+  trigger: Trigger<T>;
+  subscription: Subscription<T>;
+}
+
 class Agent {
   model: Model;
   prompt: string;
   tools: Tool[];
   skills: Skill[];
   mcp: McpClient[];
+  private registrations: Registration[] = [];
+  private unsubs: Unsub[] = [];
 
   constructor({
     model,
@@ -210,6 +218,40 @@ class Agent {
     this.tools = tools;
     this.skills = skills;
     this.mcp = mcp ?? [];
+  }
+
+  on<T>(trigger: Trigger<T>, subscription: Subscription<T>): void {
+    this.registrations.push({
+      trigger,
+      subscription,
+    } as Registration);
+  }
+
+  async start(): Promise<void> {
+    for (const { trigger, subscription } of this.registrations) {
+      const unsub = await trigger.start(async (event) => {
+        try {
+          const prompt =
+            typeof subscription.prompt === 'function'
+              ? await subscription.prompt(event)
+              : subscription.prompt;
+          await this.createSession({ prompt });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(
+            `[drone] trigger "${trigger.name}" handler failed: ${message}`,
+          );
+        }
+      });
+      this.unsubs.push(unsub);
+    }
+  }
+
+  async stop(): Promise<void> {
+    const unsubs = this.unsubs;
+    this.unsubs = [];
+    await Promise.all(unsubs.map((u) => u()));
   }
 
   buildSystem(allTools: Tool[]): string {
