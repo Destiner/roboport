@@ -3,38 +3,43 @@
 A small TypeScript framework for building LLM agents. Composable primitives — `Agent`, `Model`, `Tool`, `Skill` — with first-class MCP and pluggable model providers (Anthropic, OpenAI, OpenAI-compatible, Moonshot).
 
 ```ts
-import { Agent } from '@/core';
+import { Agent, Skill } from '@/core';
+import { claudeCode } from '@/harness';
 import { AnthropicModel } from '@/models';
-import { linearMcp } from '@/mcp';
+import { grafanaMcp, linearMcp } from '@/mcp';
+
+const incidentTriage = new Skill({
+  name: 'incident-triage',
+  description: 'Investigate a Grafana alert and open a Linear triage ticket.',
+  content: '...', // playbook lives here
+});
 
 const agent = new Agent({
   model: new AnthropicModel('claude-sonnet-4-6'),
-  prompt: 'You are a Linear assistant.',
-  tools: [],
-  skills: [],
-  mcp: [linearMcp({ apiKey: process.env.LINEAR_API_KEY! })],
+  prompt: 'You are an on-call triage agent.',
+  tools: claudeCode.tools,
+  skills: [incidentTriage],
+  mcp: [
+    grafanaMcp({
+      url: process.env.GRAFANA_URL!,
+      serviceAccountToken: process.env.GRAFANA_TOKEN!,
+    }),
+    linearMcp({ apiKey: process.env.LINEAR_API_KEY! }),
+  ],
 });
 
-const { messages } = await agent.createSession({
-  prompt: 'List open issues assigned to me.',
+agent.on('grafana:alert', (alert) => {
+  if (alert.isResolved) return;
+  agent.createSession({
+    prompt: `Triage Grafana alert ${alert.id} and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
+  });
 });
 ```
-
-## Layout
-
-- `src/core.ts` — agent loop, `Tool` / `Skill` / `Agent` primitives, deferred-tool registry
-- `src/message.ts` — provider-agnostic message types
-- `src/models/` — `Model` adapters
-- `src/mcp/` — MCP client (HTTP + stdio, Bearer + OAuth)
-- `src/harness/` — `Harness` bundle and Claude Code preset
-- `src/skills/` — skill bundles
 
 ## Scripts
 
 ```sh
 bun install
-bun run start      # run src/index.ts
-bun run dev        # hot-reload
 bun run lint
 bun run typecheck
 ```
