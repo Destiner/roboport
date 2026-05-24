@@ -16,6 +16,9 @@
     "./triggers": "./src/triggers/index.ts"
   },
   "scripts": {
+    "check": "bun run check:prettier && bun run check:eslint",
+    "check:prettier": "prettier -c \"**/*.{json,js,ts}\"",
+    "check:eslint": "eslint \"**/*.{js,ts}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -6,6 +6,9 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
+    "check": "bun run check:prettier && bun run check:eslint",
+    "check:prettier": "prettier -c \"**/*.{json,js,ts}\"",
+    "check:eslint": "eslint \"**/*.{js,ts}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

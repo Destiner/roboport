@@ -4,9 +4,9 @@
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "check": "bun run check:prettier && bun run check:eslint",
-    "check:prettier": "prettier -c \"{packages,apps}/**/*.{json,js,ts}\"",
-    "check:eslint": "eslint \"{packages,apps}/**/*.{js,ts}\"",
+    "check": "bun --filter '*' check",
+    "check:prettier": "bun --filter '*' check:prettier",
+    "check:eslint": "bun --filter '*' check:eslint",
     "typecheck": "bun --filter '*' typecheck",
     "docs": "bun --filter @drone/docs dev"
   },
