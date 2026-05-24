@@ -7,11 +7,11 @@ Minimal framework for building agents.
 Composable primitives with sane defaults. Bring your own models, tools, skills; or just use the built-ins.
 
 ```ts
-import { Agent, Skill } from '@/core';
-import { claudeCode } from '@/harness';
-import { AnthropicModel } from '@/models';
-import { Grafana, Linear } from '@/mcp';
-import { grafanaTrigger } from '@/triggers';
+import { Agent, Skill } from 'drone';
+import { claudeCode } from 'drone/harness';
+import { Grafana, Linear } from 'drone/mcp';
+import { AnthropicModel } from 'drone/models';
+import { grafanaTrigger } from 'drone/triggers';
 
 const incidentTriage = new Skill({
   name: 'incident-triage',
@@ -58,7 +58,7 @@ bun run typecheck
 `OpenAIModel` uses `OPENAI_API_KEY` by default. You can also pass `auth: { type: 'apiKey', apiKey }`.
 
 ```ts
-import { OpenAIModel } from '@/models';
+import { OpenAIModel } from 'drone/models';
 
 const model = new OpenAIModel('gpt-5.4-mini', {
   auth: { type: 'apiKey', apiKey: process.env.OPENAI_API_KEY },
