@@ -271,8 +271,6 @@ class GithubReceiver {
       return new Response('invalid json', { status: 400 });
     }
 
-    if (deliveryId) this.deliveries.add(deliveryId);
-
     switch (eventType) {
       case 'pull_request':
         dispatch(this.prBus, payload as PullRequestEvent);
@@ -289,6 +287,7 @@ class GithubReceiver {
       default:
         break;
     }
+    if (deliveryId) this.deliveries.add(deliveryId);
     return new Response('ok', { status: 200 });
   };
 }
