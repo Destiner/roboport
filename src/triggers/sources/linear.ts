@@ -1,5 +1,5 @@
-import { dispatch, makeBus, subscribe } from './bus';
-import type { Trigger } from './core';
+import { dispatch, makeBus, subscribe } from '../bus';
+import type { Trigger } from '../core';
 
 type Json = Record<string, unknown>;
 

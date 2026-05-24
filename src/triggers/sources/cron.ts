@@ -1,4 +1,4 @@
-import type { Trigger, Unsub } from './core';
+import type { Trigger, Unsub } from '../core';
 
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 

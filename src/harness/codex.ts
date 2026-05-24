@@ -1,13 +1,126 @@
-import type { Tool } from '@/core';
+import { z } from 'zod';
+
+import { Tool, type SearchHit } from '@/core';
 
 import { Harness } from './core';
-import {
-  applyPatch,
-  codexWebSearch,
-  createUpdatePlanTool,
-  execCommand,
-  toolSearch,
-} from './shared';
+import { applyPatchText, createToolSearch, runShell } from './shared';
+
+const execCommand = new Tool({
+  name: 'exec_command',
+  description:
+    'Runs a shell command and returns stdout, stderr, and the exit code when non-zero.',
+  inputSchema: z.object({
+    cmd: z.string().describe('Shell command to execute.'),
+    workdir: z
+      .string()
+      .optional()
+      .describe('Working directory to run the command in.'),
+    shell: z.string().optional().describe('Shell binary to launch.'),
+    login: z
+      .boolean()
+      .optional()
+      .describe('Whether to run the shell with login semantics.'),
+    tty: z
+      .boolean()
+      .optional()
+      .describe('Pseudo-TTY allocation is not implemented.'),
+    yield_time_ms: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Maximum time to wait before returning output.'),
+    max_output_tokens: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Approximate maximum output tokens to return.'),
+  }),
+  execute: async ({
+    cmd,
+    workdir,
+    shell,
+    login,
+    tty,
+    yield_time_ms,
+    max_output_tokens,
+  }): Promise<string> => {
+    if (tty) {
+      throw new Error('tty requires runtime support and is not implemented.');
+    }
+    const output = await runShell({
+      cmd,
+      workdir,
+      shell,
+      login,
+      timeout: yield_time_ms,
+    });
+    if (max_output_tokens === undefined) return output;
+    return output.slice(0, max_output_tokens * 4);
+  },
+});
+
+const applyPatch = new Tool({
+  name: 'apply_patch',
+  description:
+    'Applies a patch in the Codex apply_patch format. The patch must include Begin Patch and End Patch markers.',
+  inputSchema: z.object({
+    patch: z.string().describe('The full apply_patch patch text.'),
+  }),
+  execute: ({ patch }): Promise<string> => applyPatchText(patch),
+});
+
+const webSearch = new Tool({
+  name: 'web_search',
+  description:
+    'Search the web for up-to-date information beyond the model knowledge cutoff.',
+  inputSchema: z.object({
+    query: z.string().min(2).describe('The search query to use.'),
+    allowed_domains: z.array(z.string()).optional(),
+    blocked_domains: z.array(z.string()).optional(),
+  }),
+  deferred: true,
+  execute: (
+    { query, allowed_domains, blocked_domains },
+    ctx,
+  ): Promise<SearchHit[]> =>
+    ctx.searchWeb(query, {
+      allowedDomains: allowed_domains,
+      blockedDomains: blocked_domains,
+    }),
+});
+
+const PLAN_STORE_KEY = 'codex.plan';
+
+const updatePlan = new Tool({
+  name: 'update_plan',
+  description: 'Updates the task plan with a concise list of steps.',
+  inputSchema: z.object({
+    explanation: z
+      .string()
+      .optional()
+      .describe('Optional explanation for why the plan changed.'),
+    plan: z.array(
+      z.object({
+        step: z.string().describe('A concise plan step.'),
+        status: z.enum(['pending', 'in_progress', 'completed']),
+      }),
+    ),
+  }),
+  execute: ({ explanation, plan }, ctx): string => {
+    const activeCount = plan.filter(
+      (item) => item.status === 'in_progress',
+    ).length;
+    if (activeCount > 1) {
+      throw new Error('At most one plan item can be in_progress.');
+    }
+    ctx.session.store.set(PLAN_STORE_KEY, plan);
+    const lines = plan.map((item) => `- ${item.status}: ${item.step}`);
+    if (explanation) return `${explanation}\n${lines.join('\n')}`;
+    return lines.join('\n');
+  },
+});
 
 const system = `You are a coding agent running in a Codex-style harness.
 You help users modify, inspect, and explain code in the current workspace. Be precise, safe, and concise.
@@ -41,9 +154,9 @@ You help users modify, inspect, and explain code in the current workspace. Be pr
 const tools: Tool[] = [
   execCommand,
   applyPatch,
-  createUpdatePlanTool('codex.plan'),
-  codexWebSearch,
-  toolSearch,
+  updatePlan,
+  webSearch,
+  createToolSearch(),
 ];
 
 const harness = new Harness(system, tools);

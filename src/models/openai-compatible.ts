@@ -2,9 +2,11 @@ import {
   Model,
   type CreateMessageParams,
   type CreateMessageResponse,
+  type Message,
   type StopReason,
+  type TextPart,
+  type ToolCallPart,
 } from '@/core';
-import type { Message, TextPart, ToolCallPart } from '@/message';
 
 interface OpenAIToolCall {
   id: string;
