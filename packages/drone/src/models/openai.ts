@@ -10,6 +10,7 @@ import type {
   Tool,
   ToolCallPart,
 } from '@/core';
+import { env } from '@/env';
 
 import { OpenAICodexAuth } from './openai-codex-auth';
 import { OpenAICompatibleModel } from './openai-compatible';
@@ -201,9 +202,7 @@ class OpenAIModel extends OpenAICompatibleModel {
   constructor(modelName: OpenAIModelName, options?: OpenAIModelOptions) {
     const auth = options?.auth ?? { type: 'apiKey' };
     const key: string =
-      auth.type === 'apiKey'
-        ? (auth.apiKey ?? process.env.OPENAI_API_KEY ?? '')
-        : '';
+      auth.type === 'apiKey' ? (auth.apiKey ?? env.openaiApiKey ?? '') : '';
     if (auth.type === 'apiKey' && !key) {
       throw new Error(
         'No OpenAI API key found. Set OPENAI_API_KEY or pass auth: { type: "apiKey", apiKey }.',

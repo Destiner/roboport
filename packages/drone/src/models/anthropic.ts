@@ -10,6 +10,7 @@ import {
   type TextPart,
   type ToolCallPart,
 } from '@/core';
+import { env } from '@/env';
 
 const ANTHROPIC_MODELS = [
   'claude-opus-4-7',
@@ -109,7 +110,7 @@ class AnthropicModel extends Model {
   constructor(modelName: AnthropicModelName, options?: { apiKey?: string }) {
     super();
     this.modelName = modelName;
-    const key = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    const key = options?.apiKey ?? env.anthropicApiKey;
     if (!key) {
       throw new Error(
         'No Anthropic API key found. Set ANTHROPIC_API_KEY or pass apiKey.',

@@ -1,4 +1,5 @@
 import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
+import { env } from '@/env';
 
 import {
   OpenAICompatibleModel,
@@ -32,7 +33,7 @@ class MoonshotModel extends OpenAICompatibleModel {
     modelName: MoonshotModelName,
     options?: { apiKey?: string; baseUrl?: string },
   ) {
-    const key = options?.apiKey ?? process.env.MOONSHOT_API_KEY;
+    const key = options?.apiKey ?? env.moonshotApiKey;
     if (!key) {
       throw new Error(
         'No Moonshot API key found. Set MOONSHOT_API_KEY or pass apiKey.',
