@@ -53,6 +53,16 @@ bun run check
 bun run typecheck
 ```
 
+## Model thinking
+
+Model adapters that support reasoning can opt in with a shared `thinking` option:
+
+```ts
+new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' });
+```
+
+Levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Unsupported levels are mapped or ignored by each provider adapter.
+
 ## Status
 
 Early. Experimental. APIs will change.
