@@ -6,7 +6,7 @@ import { prReview } from '@/skills';
 import { logMessages } from './common';
 
 const agent = new Agent({
-  model: new OpenAIModel('gpt-5.5'),
+  model: new OpenAIModel('gpt-5.5', { thinking: 'high' }),
   prompt: codex.system,
   tools: codex.tools,
   skills: [prReview],

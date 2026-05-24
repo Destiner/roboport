@@ -15,6 +15,7 @@ function createPrReviewAgent(config: Config): Agent {
   return new Agent({
     model: new OpenAIModel('gpt-5.5', {
       auth: { type: 'codex', authFile: config.codexAuthFile },
+      thinking: 'high',
     }),
     prompt: codex.system,
     tools: codex.tools,
