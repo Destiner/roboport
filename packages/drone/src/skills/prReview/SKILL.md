@@ -61,7 +61,15 @@ These destroy signal-to-noise:
 
 ## Output
 
-Markdown. Lead with one line summarising the change (the same summary from the skim pass) — always, even when there are no findings. Then up to three sections, all optional — omit any that's empty:
+Markdown. Order is fixed: overview, then findings, then verdict.
+
+1. **Overview** — one line summarising the change (the same summary from the skim pass). Always present.
+2. **Findings** — up to three sections (`## Must fix`, `## Should consider`, `## Nits`). Omit any section that has no findings. Do not write `- None.` or otherwise list empty sections.
+3. **Verdict** — one line on its own. One of: `Approve`, `Approve with must-fixes`, `Request changes`.
+
+When there are no findings at all, the whole output is two lines: the overview and the verdict. No section headers, no "No findings" filler.
+
+With findings:
 
 ```
 <one-line summary of the change>
@@ -71,12 +79,15 @@ Markdown. Lead with one line summarising the change (the same summary from the s
 
 ## Should consider
 - ...
-
-## Nits
-- ...
 ```
 
-End with one line — a verdict. One of: `Approve`, `Approve with must-fixes`, `Request changes`.
+Without findings:
+
+```
+<one-line summary of the change>
+
+Approve
+```
 
 No praise section. No confidence scores. Include a committable suggestion only when it fully fixes the issue with no follow-up.
 
