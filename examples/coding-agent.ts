@@ -10,11 +10,9 @@ const agent = new Agent({
   skills: [codeSimplifier],
 });
 
-const prompt =
-  process.argv.slice(2).join(' ').trim() ||
-  'Summarise the changes on the current branch.';
-
-const session = await agent.createSession({ prompt });
+const session = await agent.createSession({
+  prompt: 'Summarise the changes on the current branch.',
+});
 
 for (const message of session.messages) {
   if (message.role === 'system') continue;

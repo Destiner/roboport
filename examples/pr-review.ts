@@ -10,10 +10,9 @@ const agent = new Agent({
   skills: [prReview],
 });
 
-const prompt =
-  process.argv.slice(2).join(' ').trim() || 'Review the current branch.';
-
-const session = await agent.createSession({ prompt });
+const session = await agent.createSession({
+  prompt: 'Review the current branch.',
+});
 
 for (const message of session.messages) {
   if (message.role === 'system') continue;
