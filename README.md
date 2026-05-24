@@ -20,7 +20,7 @@ const incidentTriage = new Skill({
 });
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-sonnet-4-6'),
+  model: new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' }),
   prompt: 'You are an on-call triage agent.',
   tools: claudeCode.tools,
   skills: [incidentTriage],
