@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       !github.event.pull_request.draft &&
-      github.event.pull_request.user.login == 'Destiner'
+      github.actor == 'Destiner'
 
     steps:
       - name: Checkout repository
