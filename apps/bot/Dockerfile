@@ -5,7 +5,7 @@ RUN apk add --no-cache git github-cli ripgrep
 
 WORKDIR /app
 
-COPY package.json bun.lock bunfig.toml ./
+COPY package.json bun.lock bunfig.toml tsconfig.json ./
 COPY apps/bot/package.json ./apps/bot/
 COPY packages/drone/package.json ./packages/drone/
 
