@@ -53,44 +53,6 @@ bun run check
 bun run typecheck
 ```
 
-## GitHub webhooks
-
-`githubTrigger` requires the webhook secret from your GitHub webhook settings. It verifies `x-hub-signature-256` before dispatching events.
-
-```ts
-import { githubTrigger } from 'drone/triggers';
-
-const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET! });
-
-agent.on(github.pullRequest({ actions: ['opened', 'synchronize'] }), {
-  prompt: (event) => `Review PR #${event.number}: ${event.pull_request.title}`,
-});
-
-Bun.serve({ port: 8080, fetch: (req) => github.handle(req) });
-```
-
-## Models
-
-`OpenAIModel` uses `OPENAI_API_KEY` by default. You can also pass `auth: { type: 'apiKey', apiKey }`.
-
-```ts
-import { OpenAIModel } from 'drone/models';
-
-const model = new OpenAIModel('gpt-5.4-mini', {
-  auth: { type: 'apiKey', apiKey: process.env.OPENAI_API_KEY },
-});
-```
-
-To reuse ChatGPT OAuth tokens from `codex login`, pass Codex auth:
-
-```ts
-const model = new OpenAIModel('gpt-5.3-codex', {
-  auth: { type: 'codex' },
-});
-```
-
-Codex auth checks `DRONE_OPENAI_CODEX_AUTH_FILE`, then `CODEX_HOME/auth.json`, `~/.codex/auth.json`, and `~/.drone/openai-codex-auth.json`.
-
 ## Status
 
 Early. Experimental. APIs will change.
