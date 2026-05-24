@@ -61,7 +61,7 @@ Model adapters that support reasoning can opt in with a shared `thinking` option
 new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' });
 ```
 
-Levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Unsupported levels are mapped or ignored by each provider adapter.
+Levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Provider adapters map supported levels to their wire formats; unsupported levels may be collapsed, ignored, or rejected by the provider.
 
 ## Status
 
