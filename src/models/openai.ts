@@ -1,10 +1,20 @@
-import type { SearchHit, SearchOptions } from '@/core';
+import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
 
 import { OpenAICompatibleModel } from './openai-compatible';
 
+const OPENAI_MODELS = [
+  'gpt-5.5',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano',
+  'gpt-5.3-codex',
+] as const;
+
+type OpenAIModelName = LiteralUnion<(typeof OPENAI_MODELS)[number]>;
+
 class OpenAIModel extends OpenAICompatibleModel {
   constructor(
-    modelName: string,
+    modelName: OpenAIModelName,
     options?: { apiKey?: string; baseUrl?: string },
   ) {
     const key = options?.apiKey ?? process.env.OPENAI_API_KEY;
@@ -73,5 +83,4 @@ class OpenAIModel extends OpenAICompatibleModel {
   }
 }
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { OpenAIModel };
+export { OpenAIModel, OPENAI_MODELS };

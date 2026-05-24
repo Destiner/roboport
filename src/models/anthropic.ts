@@ -2,11 +2,22 @@ import {
   Model,
   type CreateMessageParams,
   type CreateMessageResponse,
+  type LiteralUnion,
   type SearchHit,
   type SearchOptions,
   type StopReason,
 } from '@/core';
 import type { Message, TextPart, ToolCallPart } from '@/message';
+
+const ANTHROPIC_MODELS = [
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+  'claude-sonnet-4-6',
+  'claude-sonnet-4-5',
+  'claude-haiku-4-5',
+] as const;
+
+type AnthropicModelName = LiteralUnion<(typeof ANTHROPIC_MODELS)[number]>;
 
 type AnthropicWireContent =
   | { type: 'text'; text: string }
@@ -93,7 +104,7 @@ class AnthropicModel extends Model {
   modelName: string;
   apiKey: string;
 
-  constructor(modelName: string, options?: { apiKey?: string }) {
+  constructor(modelName: AnthropicModelName, options?: { apiKey?: string }) {
     super();
     this.modelName = modelName;
     const key = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -229,5 +240,4 @@ class AnthropicModel extends Model {
   }
 }
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { AnthropicModel };
+export { AnthropicModel, ANTHROPIC_MODELS };

@@ -1,9 +1,13 @@
-import type { SearchHit, SearchOptions } from '@/core';
+import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
 
 import {
   OpenAICompatibleModel,
   type OpenAIAssistantWireMessage,
 } from './openai-compatible';
+
+const MOONSHOT_MODELS = ['kimi-k2.6', 'kimi-k2.5'] as const;
+
+type MoonshotModelName = LiteralUnion<(typeof MOONSHOT_MODELS)[number]>;
 
 interface MoonshotToolCall {
   id: string;
@@ -25,7 +29,7 @@ interface MoonshotChatResponse {
 
 class MoonshotModel extends OpenAICompatibleModel {
   constructor(
-    modelName: string,
+    modelName: MoonshotModelName,
     options?: { apiKey?: string; baseUrl?: string },
   ) {
     const key = options?.apiKey ?? process.env.MOONSHOT_API_KEY;
@@ -139,5 +143,4 @@ class MoonshotModel extends OpenAICompatibleModel {
   }
 }
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { MoonshotModel };
+export { MoonshotModel, MOONSHOT_MODELS };

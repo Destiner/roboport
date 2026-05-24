@@ -1,6 +1,15 @@
-import type { SearchHit, SearchOptions } from '@/core';
+import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
 
 import { OpenAICompatibleModel } from './openai-compatible';
+
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.1-pro',
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash',
+] as const;
+
+type GeminiModelName = LiteralUnion<(typeof GEMINI_MODELS)[number]>;
 
 interface GroundingChunk {
   web?: { uri?: string; title?: string };
@@ -16,7 +25,7 @@ interface GenerateContentResponse {
 
 class GeminiModel extends OpenAICompatibleModel {
   constructor(
-    modelName: string,
+    modelName: GeminiModelName,
     options?: { apiKey?: string; baseUrl?: string },
   ) {
     const key = options?.apiKey ?? process.env.GEMINI_API_KEY;
@@ -77,5 +86,4 @@ class GeminiModel extends OpenAICompatibleModel {
   }
 }
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { GeminiModel };
+export { GeminiModel, GEMINI_MODELS };

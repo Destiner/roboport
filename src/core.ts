@@ -10,6 +10,11 @@ import type { Subscription, Trigger, Unsub } from './triggers/core';
 
 type MaybePromise<T> = T | Promise<T>;
 
+// Preserves literal autocompletion in `T | string` unions: the `& {}` branch
+// stops TypeScript from widening the whole union to `string`, while still
+// accepting any string at the call site.
+type LiteralUnion<T extends string> = T | (string & {});
+
 type StopReason =
   | 'end_turn'
   | 'tool_use'
@@ -403,4 +408,5 @@ export {
   type CreateMessageResponse,
   type StopReason,
   type McpClient,
+  type LiteralUnion,
 };
