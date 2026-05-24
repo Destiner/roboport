@@ -7,7 +7,7 @@
     "check": "bun run check:prettier && bun run check:eslint",
     "check:prettier": "prettier -c \"{packages,apps}/**/*.{json,js,ts}\"",
     "check:eslint": "eslint \"{packages,apps}/**/*.{js,ts}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && bun --filter @drone/docs typecheck",
     "docs": "bun --filter @drone/docs dev"
   },
   "devDependencies": {
