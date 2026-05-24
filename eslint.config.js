@@ -16,6 +16,9 @@ export default [
       ecmaVersion: 2020,
       sourceType: 'module',
     },
+    settings: {
+      'import-x/core-modules': ['bun:test'],
+    },
     rules: {
       'import-x/first': 'error',
       'import-x/exports-last': 'error',
@@ -53,7 +56,7 @@ export default [
       'import-x/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: ['eslint.config.js', 'test/**/*.test.ts'],
+          devDependencies: ['eslint.config.js', '**/test/**/*.test.ts'],
         },
       ],
       '@typescript-eslint/explicit-function-return-type': 'error',

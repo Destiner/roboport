@@ -19,6 +19,7 @@
     "check": "bun run check:prettier && bun run check:eslint",
     "check:prettier": "prettier -c \"**/*.{json,js,ts}\"",
     "check:eslint": "eslint \"**/*.{js,ts}\"",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
