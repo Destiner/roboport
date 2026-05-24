@@ -3,6 +3,9 @@ import { flatConfigs } from 'eslint-plugin-import-x';
 import { configs as tsConfigs, parser as tsParser } from 'typescript-eslint';
 
 export default [
+  {
+    ignores: ['**/dist/**', '**/.vocs/**', '**/pages.gen.ts'],
+  },
   js.configs.recommended,
   flatConfigs.recommended,
   flatConfigs.typescript,

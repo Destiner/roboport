@@ -7,7 +7,8 @@
     "check": "bun run check:prettier && bun run check:eslint",
     "check:prettier": "prettier -c \"{packages,apps}/**/*.{json,js,ts}\"",
     "check:eslint": "eslint \"{packages,apps}/**/*.{js,ts}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && bun --filter @drone/docs typecheck",
+    "docs": "bun --filter @drone/docs dev"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -18,5 +19,8 @@
     "prettier": "^3.8.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4"
+  },
+  "resolutions": {
+    "@vitejs/plugin-rsc": "0.5.19"
   }
 }

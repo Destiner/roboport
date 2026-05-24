@@ -32,5 +32,6 @@
     "paths": {
       "@/*": ["./packages/drone/src/*"]
     }
-  }
+  },
+  "exclude": ["apps/docs"]
 }

@@ -1,2 +1,5 @@
 node_modules/
 .env
+.vocs/
+dist/
+pages.gen.ts
