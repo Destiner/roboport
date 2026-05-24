@@ -53,6 +53,7 @@ export default [
           devDependencies: [
             'eslint.config.js',
             'vite.config.ts',
+            'scripts/**/*.ts',
             'test/**/*.test.ts',
           ],
         },

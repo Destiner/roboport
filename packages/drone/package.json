@@ -1,0 +1,21 @@
+{
+  "name": "drone",
+  "version": "1.0.0",
+  "author": {
+    "name": "Timur Badretdinov",
+    "url": "https://github.com/Destiner"
+  },
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./harness": "./src/harness/index.ts",
+    "./mcp": "./src/mcp/index.ts",
+    "./models": "./src/models/index.ts",
+    "./skills": "./src/skills/index.ts",
+    "./triggers": "./src/triggers/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
