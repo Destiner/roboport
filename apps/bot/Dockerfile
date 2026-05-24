@@ -1,7 +1,7 @@
 # Build context expected to be the monorepo root.
 FROM oven/bun:1-alpine
 
-RUN apk add --no-cache git github-cli ripgrep
+RUN apk add --no-cache bash git github-cli ripgrep
 
 WORKDIR /app
 
