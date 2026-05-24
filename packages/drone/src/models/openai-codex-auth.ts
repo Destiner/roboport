@@ -2,6 +2,8 @@ import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
+import { env } from '@/env';
+
 const CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CODEX_TOKEN_URL = 'https://auth.openai.com/oauth/token';
 const CHATGPT_AUTH_CLAIM = 'https://api.openai.com/auth';
@@ -41,9 +43,9 @@ function expandPath(path: string): string {
 
 function defaultAuthFiles(): string[] {
   const files: string[] = [];
-  const explicit = process.env.DRONE_OPENAI_CODEX_AUTH_FILE;
+  const explicit = env.openaiCodexAuthFile;
   if (explicit) files.push(expandPath(explicit));
-  const codexHome = process.env.CODEX_HOME;
+  const codexHome = env.codexHome;
   if (codexHome) files.push(join(expandPath(codexHome), 'auth.json'));
   files.push(join(homedir(), '.codex', 'auth.json'));
   files.push(join(homedir(), '.drone', 'openai-codex-auth.json'));

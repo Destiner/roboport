@@ -1,4 +1,5 @@
 import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
+import { env } from '@/env';
 
 import { OpenAICompatibleModel } from './openai-compatible';
 
@@ -28,7 +29,7 @@ class GeminiModel extends OpenAICompatibleModel {
     modelName: GeminiModelName,
     options?: { apiKey?: string; baseUrl?: string },
   ) {
-    const key = options?.apiKey ?? process.env.GEMINI_API_KEY;
+    const key = options?.apiKey ?? env.geminiApiKey;
     if (!key) {
       throw new Error(
         'No Gemini API key found. Set GEMINI_API_KEY or pass apiKey.',
