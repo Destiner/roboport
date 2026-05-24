@@ -306,6 +306,10 @@ class OpenAIModel extends OpenAICompatibleModel {
   private async createCodexMessage(
     params: CreateMessageParams,
   ): Promise<CreateMessageResponse> {
+    if (params.maxTokens !== undefined) {
+      throw new Error('OpenAI Codex auth does not support maxTokens.');
+    }
+
     const { messages, tools } = params;
     const { instructions, input } = responsesMessageInput(messages);
     const wireTools = responsesTools(tools);
