@@ -20,7 +20,7 @@ const incidentTriage = new Skill({
 });
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-sonnet-4-6'),
+  model: new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' }),
   prompt: 'You are an on-call triage agent.',
   tools: claudeCode.tools,
   skills: [incidentTriage],
@@ -52,6 +52,16 @@ bun install
 bun run check
 bun run typecheck
 ```
+
+## Model thinking
+
+Model adapters that support reasoning can opt in with a shared `thinking` option:
+
+```ts
+new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' });
+```
+
+Levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Provider adapters map supported levels to their wire formats; unsupported levels may be collapsed, ignored, or rejected by the provider. When a provider returns reasoning content, assistant messages include `thinking` parts alongside text and tool calls.
 
 ## Status
 

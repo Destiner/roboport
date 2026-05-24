@@ -5,6 +5,7 @@ import {
   type Message,
   type StopReason,
   type TextPart,
+  type ThinkingLevel,
   type ToolCallPart,
 } from '@/core';
 
@@ -60,15 +61,17 @@ abstract class OpenAICompatibleModel extends Model {
   modelName: string;
   apiKey: string;
   baseUrl: string;
+  thinking: ThinkingLevel;
 
   protected constructor(
     modelName: string,
-    options: { apiKey: string; baseUrl: string },
+    options: { apiKey: string; baseUrl: string; thinking?: ThinkingLevel },
   ) {
     super();
     this.modelName = modelName;
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl;
+    this.thinking = options.thinking ?? 'off';
   }
 
   override async createMessage(
@@ -92,6 +95,7 @@ abstract class OpenAICompatibleModel extends Model {
       max_completion_tokens: maxTokens,
     };
     if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
+    this.applyThinking(body);
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -174,7 +178,7 @@ abstract class OpenAICompatibleModel extends Model {
         for (const part of msg.content) {
           if (part.type === 'text') {
             texts.push(part.text);
-          } else {
+          } else if (part.type === 'tool-call') {
             toolCalls.push({
               id: part.toolCallId,
               type: 'function',
@@ -184,6 +188,8 @@ abstract class OpenAICompatibleModel extends Model {
               },
             });
           }
+          // Thinking parts originate from Anthropic and have no OpenAI-compatible
+          // wire representation; drop them when serialising.
         }
 
         const assistantMsg: OpenAIAssistantWireMessage = {
@@ -211,6 +217,14 @@ abstract class OpenAICompatibleModel extends Model {
     msg: OpenAIAssistantWireMessage,
   ): OpenAIAssistantWireMessage {
     return msg;
+  }
+
+  // Hook for subclasses to map the unified `thinking` level onto provider-
+  // specific request fields (e.g. `reasoning_effort`, `enable_thinking`).
+  // Default is a no-op so chat-completions servers that don't understand any
+  // reasoning fields keep working.
+  protected applyThinking(body: Record<string, unknown>): void {
+    void body;
   }
 }
 

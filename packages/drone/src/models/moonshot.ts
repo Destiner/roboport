@@ -1,4 +1,9 @@
-import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
+import type {
+  LiteralUnion,
+  SearchHit,
+  SearchOptions,
+  ThinkingLevel,
+} from '@/core';
 import { env } from '@/env';
 
 import {
@@ -31,7 +36,7 @@ interface MoonshotChatResponse {
 class MoonshotModel extends OpenAICompatibleModel {
   constructor(
     modelName: MoonshotModelName,
-    options?: { apiKey?: string; baseUrl?: string },
+    options?: { apiKey?: string; baseUrl?: string; thinking?: ThinkingLevel },
   ) {
     const key = options?.apiKey ?? env.moonshotApiKey;
     if (!key) {
@@ -42,6 +47,7 @@ class MoonshotModel extends OpenAICompatibleModel {
     super(modelName, {
       apiKey: key,
       baseUrl: options?.baseUrl ?? 'https://api.moonshot.ai/v1',
+      thinking: options?.thinking,
     });
   }
 
@@ -52,6 +58,21 @@ class MoonshotModel extends OpenAICompatibleModel {
   ): OpenAIAssistantWireMessage {
     if (!msg.tool_calls) return msg;
     return { ...msg, reasoning_content: '' } as OpenAIAssistantWireMessage;
+  }
+
+  // Kimi exposes thinking as an on/off switch with two different wire shapes:
+  //   K2.5 → `enable_thinking: true`
+  //   K2.6 → `chat_template_kwargs.thinking.type: 'enabled'` (replaces the
+  //          legacy field)
+  // Any `thinking` level above `off` flips the switch on; Kimi has no graduated
+  // reasoning effort to map onto.
+  protected override applyThinking(body: Record<string, unknown>): void {
+    if (this.thinking === 'off') return;
+    if (this.modelName.includes('k2.6')) {
+      body.chat_template_kwargs = { thinking: { type: 'enabled' } };
+      return;
+    }
+    body.enable_thinking = true;
   }
 
   override async searchWeb(
