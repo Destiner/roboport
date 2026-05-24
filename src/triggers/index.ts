@@ -11,7 +11,7 @@ import {
   type CronOptions,
   type Schedule,
   type Weekday,
-} from './cron';
+} from './sources/cron';
 import {
   githubTrigger,
   GithubReceiver,
@@ -19,7 +19,7 @@ import {
   type IssuesEvent,
   type PullRequestEvent,
   type PushEvent,
-} from './github';
+} from './sources/github';
 import {
   grafanaTrigger,
   GrafanaReceiver,
@@ -27,7 +27,7 @@ import {
   type GrafanaAlert,
   type GrafanaAlertEvent,
   type GrafanaWebhookPayload,
-} from './grafana';
+} from './sources/grafana';
 import {
   linearTrigger,
   LinearReceiver,
@@ -36,7 +36,7 @@ import {
   type LinearIssueEvent,
   type LinearProjectEvent,
   type LinearWebhook,
-} from './linear';
+} from './sources/linear';
 
 export {
   cron,
