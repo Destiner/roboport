@@ -7,6 +7,7 @@ Minimal TypeScript framework for building LLM agents.
 - `bun install` - Install dependencies
 - `bun run check` - Prettier + ESLint
 - `bun run typecheck`
+- `bun run docs` - Start the docs site
 
 No test suite yet.
 
@@ -30,6 +31,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/triggers/` - Trigger primitive (`cron`, GitHub/Grafana/Linear webhook receivers)
   - `examples/` - Standalone usage examples
 - `apps/bot/` - Webhook-driven runner. Hono server mounts `GithubReceiver` at `POST /webhooks/github`, dispatches `pr-review` and `docs-update` workflows per actionable PR event. Deployed to Railway via `apps/bot/Dockerfile`; codex auth/refresh tokens persist on a mounted volume.
+- `apps/docs/` - Vocs docs site (`name: "@drone/docs"`).
 
 ## Patterns
 
