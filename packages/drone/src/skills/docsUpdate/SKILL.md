@@ -1,13 +1,13 @@
 ---
 name: docs-update
-description: Keeps a repo's internal docs (README.md, AGENTS.md / CLAUDE.md, docs/**/*.md) in sync with a code change. Routes each fact to one canonical home, preserves the existing voice, and skips trivial changes. Use after a PR-sized change set when public API, commands, structure, or stack claims may have shifted.
+description: Keeps a repo's internal docs (AGENTS.md / CLAUDE.md, docs/**/*.md) in sync with a code change. Routes each fact to one canonical home, preserves the existing voice, and skips trivial changes. Use after a PR-sized change set when public API, commands, structure, or stack claims may have shifted.
 ---
 
 # Docs update
 
-Keep a repo's *internal* docs (`README.md`, `AGENTS.md` / `CLAUDE.md`, `docs/**/*.md`) in sync with a code change. Surgical edits, one canonical home per fact, matched voice.
+Keep a repo's *internal* docs (`AGENTS.md` / `CLAUDE.md`, `docs/**/*.md`) in sync with a code change. Surgical edits, one canonical home per fact, matched voice.
 
-Out of scope: public/user-facing docs sites (Mintlify, Docusaurus, API reference), changelogs, release notes.
+Out of scope: `README.md`, public/user-facing docs sites (Mintlify, Docusaurus, API reference), changelogs, release notes.
 
 ## When this runs
 
@@ -25,7 +25,7 @@ If unsure whether a change is doc-worthy, default to *no edit*. Drift is cheaper
 Read once, hold in memory:
 
 - The diff: `git diff <base>..HEAD --name-only` and `git diff <base>..HEAD` (or the staged diff if pre-commit).
-- The docs in scope: `README.md`, `AGENTS.md` / `CLAUDE.md`, and `docs/**/*.md`.
+- The docs in scope: `AGENTS.md` / `CLAUDE.md` and `docs/**/*.md`. Skip `README.md`.
 
 Do not pre-read source files. Open them only to verify a specific claim.
 
@@ -33,14 +33,13 @@ Do not pre-read source files. Open them only to verify a specific claim.
 
 | Fact type | Lives in |
 |---|---|
-| Consumer-facing usage, install, status | `README.md` |
 | Build/test/lint commands, conventions, gotchas, project structure | `AGENTS.md` |
 | Multi-page how-to, architecture, ADRs | `docs/<topic>.md` |
 
 When a fact lands in the diff:
 
 1. Look for an existing doc that already covers the topic — edit there.
-2. If none, place it in the *narrowest* home: a bullet in `AGENTS.md` before a new `docs/` page; a new `docs/` page before expanding `README.md`.
+2. If none, place it in the *narrowest* home: a bullet in `AGENTS.md` before a new `docs/` page.
 3. Never duplicate. If a fact must be referenced from multiple docs, write it once and link.
 
 ## Staleness detection
