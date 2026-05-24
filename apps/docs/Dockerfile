@@ -18,4 +18,4 @@ RUN cd apps/docs && bun run build
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["sh", "-c", "cd /app/apps/docs && bun run vocs preview --port ${PORT:-3000} --host"]
+CMD ["sh", "-c", "cd /app/apps/docs && bunx vocs preview --port ${PORT:-3000} --host 0.0.0.0"]
