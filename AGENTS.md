@@ -7,9 +7,8 @@ Minimal TypeScript framework for building LLM agents.
 - `bun install` - Install dependencies
 - `bun run check` - Prettier + ESLint
 - `bun run typecheck`
+- `bun --filter drone test` - Run the framework package unit tests
 - `bun run docs` - Start the docs site
-
-No test suite yet.
 
 ## Stack
 
