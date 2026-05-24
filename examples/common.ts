@@ -1,4 +1,4 @@
-import type { Message } from '@/message';
+import type { Message } from '@/core';
 
 function logMessages(messages: Message[]): void {
   for (const message of messages) {

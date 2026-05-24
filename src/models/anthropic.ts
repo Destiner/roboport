@@ -3,11 +3,13 @@ import {
   type CreateMessageParams,
   type CreateMessageResponse,
   type LiteralUnion,
+  type Message,
   type SearchHit,
   type SearchOptions,
   type StopReason,
+  type TextPart,
+  type ToolCallPart,
 } from '@/core';
-import type { Message, TextPart, ToolCallPart } from '@/message';
 
 const ANTHROPIC_MODELS = [
   'claude-opus-4-7',
