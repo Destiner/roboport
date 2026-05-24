@@ -7,6 +7,7 @@
     "check": "bun --filter '*' check",
     "check:prettier": "bun --filter '*' check:prettier",
     "check:eslint": "bun --filter '*' check:eslint",
+    "test": "bun --filter '*' test",
     "typecheck": "bun --filter '*' typecheck",
     "docs": "bun --filter @drone/docs dev"
   },
