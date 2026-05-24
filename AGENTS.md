@@ -25,6 +25,7 @@ No test suite yet.
 - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
 - `src/harness/` - `Harness` bundle and Claude Code preset
 - `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`, `code-simplifier`); each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
+- `.github/workflows/` + `scripts/` - PR automation; `docs-update.yaml` runs `scripts/docs-update.ts` to sync internal docs and commit with `[skip ci]`
 
 ## Patterns
 
