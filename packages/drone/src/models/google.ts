@@ -1,4 +1,9 @@
-import type { LiteralUnion, SearchHit, SearchOptions } from '@/core';
+import type {
+  LiteralUnion,
+  SearchHit,
+  SearchOptions,
+  ThinkingLevel,
+} from '@/core';
 import { env } from '@/env';
 
 import { OpenAICompatibleModel } from './openai-compatible';
@@ -27,7 +32,7 @@ interface GenerateContentResponse {
 class GeminiModel extends OpenAICompatibleModel {
   constructor(
     modelName: GeminiModelName,
-    options?: { apiKey?: string; baseUrl?: string },
+    options?: { apiKey?: string; baseUrl?: string; thinking?: ThinkingLevel },
   ) {
     const key = options?.apiKey ?? env.geminiApiKey;
     if (!key) {
@@ -40,7 +45,23 @@ class GeminiModel extends OpenAICompatibleModel {
       baseUrl:
         options?.baseUrl ??
         'https://generativelanguage.googleapis.com/v1beta/openai',
+      thinking: options?.thinking,
     });
+  }
+
+  // Gemini's OpenAI compatibility shim maps `reasoning_effort` onto its own
+  // `thinking_level` parameter, but only accepts `low | medium | high`. Collapse
+  // the six unified levels onto that range; for direct `thinking_budget`
+  // control, callers can hit the native API.
+  protected override applyThinking(body: Record<string, unknown>): void {
+    if (this.thinking === 'off') return;
+    const effort =
+      this.thinking === 'minimal' || this.thinking === 'low'
+        ? 'low'
+        : this.thinking === 'medium'
+          ? 'medium'
+          : 'high';
+    body.reasoning_effort = effort;
   }
 
   override async searchWeb(

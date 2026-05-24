@@ -7,6 +7,7 @@ import type {
   SearchOptions,
   StopReason,
   TextPart,
+  ThinkingLevel,
   Tool,
   ToolCallPart,
 } from '@/core';
@@ -40,6 +41,7 @@ type OpenAIAuthOptions = OpenAIApiKeyAuthOptions | OpenAICodexAuthModelOptions;
 type OpenAIModelOptions = {
   auth?: OpenAIAuthOptions;
   baseUrl?: string;
+  thinking?: ThinkingLevel;
 };
 
 type ResponsesInputItem =
@@ -144,7 +146,7 @@ function responsesMessageInput(messages: Message[]): {
             status: 'completed',
             id: `msg_${messageIndex}`,
           });
-        } else {
+        } else if (part.type === 'tool-call') {
           input.push({
             type: 'function_call',
             id: `fc_${sanitizeResponsesId(part.toolCallId)}`,
@@ -153,6 +155,8 @@ function responsesMessageInput(messages: Message[]): {
             arguments: JSON.stringify(part.input ?? {}),
           });
         }
+        // Thinking parts originate from Anthropic and have no Responses-API
+        // round-trip representation; drop them.
       }
       messageIndex++;
       continue;
@@ -211,6 +215,7 @@ class OpenAIModel extends OpenAICompatibleModel {
     super(modelName, {
       apiKey: key,
       baseUrl: options?.baseUrl ?? 'https://api.openai.com/v1',
+      thinking: options?.thinking,
     });
     if (auth.type === 'codex') {
       this.codexAuth = new OpenAICodexAuth({
@@ -229,6 +234,15 @@ class OpenAIModel extends OpenAICompatibleModel {
       return this.createResponsesMessage(params);
     }
     return super.createMessage(params);
+  }
+
+  protected override applyThinking(body: Record<string, unknown>): void {
+    if (this.thinking === 'off') return;
+    // Chat Completions API accepts `reasoning_effort` with the same string
+    // values Codex uses (sans `xhigh`, which is Responses-only on Codex models).
+    // We pass the level through; the API rejects unsupported values for the
+    // chosen model.
+    body.reasoning_effort = this.thinking;
   }
 
   override async searchWeb(
@@ -324,6 +338,9 @@ class OpenAIModel extends OpenAICompatibleModel {
     if (wireTools) body.tools = wireTools;
     if (!this.codexAuth && maxTokens !== undefined) {
       body.max_output_tokens = maxTokens;
+    }
+    if (this.thinking !== 'off') {
+      body.reasoning = { effort: this.thinking };
     }
 
     const json = await this.fetchResponses(body);

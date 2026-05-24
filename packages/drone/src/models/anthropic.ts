@@ -8,6 +8,8 @@ import {
   type SearchOptions,
   type StopReason,
   type TextPart,
+  type ThinkingLevel,
+  type ThinkingPart,
   type ToolCallPart,
 } from '@/core';
 import { env } from '@/env';
@@ -22,8 +24,26 @@ const ANTHROPIC_MODELS = [
 
 type AnthropicModelName = LiteralUnion<(typeof ANTHROPIC_MODELS)[number]>;
 
+// Budget table anchors low/medium/high to Claude Code's `think`/`megathink`/
+// `ultrathink` keywords (4_000 / 10_000 / 31_999). `minimal` is the API floor;
+// `xhigh` exceeds Claude Code's ceiling for 64K-output models.
+const ANTHROPIC_BUDGETS: Record<Exclude<ThinkingLevel, 'off'>, number> = {
+  minimal: 1_024,
+  low: 4_000,
+  medium: 10_000,
+  high: 31_999,
+  xhigh: 60_000,
+};
+const ANTHROPIC_OUTPUT_BUFFER = 4_096;
+
 type AnthropicWireContent =
   | { type: 'text'; text: string }
+  | {
+      type: 'thinking';
+      thinking: string;
+      signature: string;
+    }
+  | { type: 'redacted_thinking'; data: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
   | {
       type: 'tool_result';
@@ -76,16 +96,25 @@ function toWire(messages: Message[]): {
     if (msg.role === 'assistant') {
       wireMessages.push({
         role: 'assistant',
-        content: msg.content.map((part) =>
-          part.type === 'text'
-            ? { type: 'text', text: part.text }
-            : {
-                type: 'tool_use',
-                id: part.toolCallId,
-                name: part.toolName,
-                input: part.input,
-              },
-        ),
+        content: msg.content.map((part): AnthropicWireContent => {
+          if (part.type === 'text') return { type: 'text', text: part.text };
+          if (part.type === 'thinking') {
+            if (part.redactedData !== undefined) {
+              return { type: 'redacted_thinking', data: part.redactedData };
+            }
+            return {
+              type: 'thinking',
+              thinking: part.text,
+              signature: part.signature ?? '',
+            };
+          }
+          return {
+            type: 'tool_use',
+            id: part.toolCallId,
+            name: part.toolName,
+            input: part.input,
+          };
+        }),
       });
       continue;
     }
@@ -106,8 +135,12 @@ function toWire(messages: Message[]): {
 class AnthropicModel extends Model {
   modelName: string;
   apiKey: string;
+  thinking: ThinkingLevel;
 
-  constructor(modelName: AnthropicModelName, options?: { apiKey?: string }) {
+  constructor(
+    modelName: AnthropicModelName,
+    options?: { apiKey?: string; thinking?: ThinkingLevel },
+  ) {
     super();
     this.modelName = modelName;
     const key = options?.apiKey ?? env.anthropicApiKey;
@@ -117,6 +150,7 @@ class AnthropicModel extends Model {
       );
     }
     this.apiKey = key;
+    this.thinking = options?.thinking ?? 'off';
   }
 
   override async createMessage(
@@ -131,13 +165,25 @@ class AnthropicModel extends Model {
       input_schema: tool.toJsonSchema(),
     }));
 
+    const budget =
+      this.thinking === 'off' ? undefined : ANTHROPIC_BUDGETS[this.thinking];
+    // Anthropic requires max_tokens > budget_tokens; keep at least
+    // ANTHROPIC_OUTPUT_BUFFER tokens of room for the actual response.
+    const effectiveMaxTokens =
+      budget === undefined
+        ? maxTokens
+        : Math.max(maxTokens, budget + ANTHROPIC_OUTPUT_BUFFER);
+
     const body: Record<string, unknown> = {
       model: this.modelName,
-      max_tokens: maxTokens,
+      max_tokens: effectiveMaxTokens,
       messages: wireMessages,
     };
     if (system !== undefined) body.system = system;
     if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
+    if (budget !== undefined) {
+      body.thinking = { type: 'enabled', budget_tokens: budget };
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -162,20 +208,33 @@ class AnthropicModel extends Model {
       usage: { input_tokens: number; output_tokens: number };
     };
 
-    const content: (TextPart | ToolCallPart)[] = json.content.map((block) => {
-      if (block.type === 'text') {
-        return { type: 'text', text: block.text };
-      }
-      if (block.type === 'tool_use') {
-        return {
-          type: 'tool-call',
-          toolCallId: block.id,
-          toolName: block.name,
-          input: block.input,
-        };
-      }
-      throw new Error(`Unexpected content block from Anthropic: ${block.type}`);
-    });
+    const content: (TextPart | ThinkingPart | ToolCallPart)[] =
+      json.content.map((block) => {
+        if (block.type === 'text') {
+          return { type: 'text', text: block.text };
+        }
+        if (block.type === 'thinking') {
+          return {
+            type: 'thinking',
+            text: block.thinking,
+            signature: block.signature,
+          };
+        }
+        if (block.type === 'redacted_thinking') {
+          return { type: 'thinking', text: '', redactedData: block.data };
+        }
+        if (block.type === 'tool_use') {
+          return {
+            type: 'tool-call',
+            toolCallId: block.id,
+            toolName: block.name,
+            input: block.input,
+          };
+        }
+        throw new Error(
+          `Unexpected content block from Anthropic: ${(block as { type: string }).type}`,
+        );
+      });
 
     return {
       id: json.id,

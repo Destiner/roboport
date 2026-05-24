@@ -3,10 +3,11 @@ import type { McpClient } from './mcp';
 import type {
   Message,
   TextPart,
+  ThinkingPart,
   ToolCallPart,
   ToolResultPart,
 } from './message';
-import { Model, type LiteralUnion } from './model';
+import { Model, type LiteralUnion, type ThinkingLevel } from './model';
 import { Skill } from './skill';
 import {
   Tool,
@@ -37,6 +38,8 @@ export {
   type SessionState,
   type StopReason,
   type TextPart,
+  type ThinkingLevel,
+  type ThinkingPart,
   type ToolCallPart,
   type ToolContext,
   type ToolRegistry,

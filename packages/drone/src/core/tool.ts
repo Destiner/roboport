@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Message, TextPart, ToolCallPart } from './message';
+import type { Message, TextPart, ThinkingPart, ToolCallPart } from './message';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -47,7 +47,7 @@ interface CreateMessageParams {
 
 interface CreateMessageResponse {
   id: string;
-  content: (TextPart | ToolCallPart)[];
+  content: (TextPart | ThinkingPart | ToolCallPart)[];
   stopReason: StopReason;
   usage: { inputTokens: number; outputTokens: number };
 }
