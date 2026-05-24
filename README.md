@@ -53,6 +53,28 @@ bun run check
 bun run typecheck
 ```
 
+## Models
+
+`OpenAIModel` uses `OPENAI_API_KEY` by default. You can also pass `auth: { type: 'apiKey', apiKey }`.
+
+```ts
+import { OpenAIModel } from '@/models';
+
+const model = new OpenAIModel('gpt-5.4-mini', {
+  auth: { type: 'apiKey', apiKey: process.env.OPENAI_API_KEY },
+});
+```
+
+To reuse ChatGPT OAuth tokens from `codex login`, pass Codex auth:
+
+```ts
+const model = new OpenAIModel('gpt-5.3-codex', {
+  auth: { type: 'codex' },
+});
+```
+
+Codex auth checks `DRONE_OPENAI_CODEX_AUTH_FILE`, then `CODEX_HOME/auth.json`, `~/.codex/auth.json`, and `~/.drone/openai-codex-auth.json`.
+
 ## Status
 
 Early. Experimental. APIs will change.
