@@ -26,13 +26,14 @@ type AnthropicModelName = LiteralUnion<(typeof ANTHROPIC_MODELS)[number]>;
 
 // Budget table anchors low/medium/high to Claude Code's `think`/`megathink`/
 // `ultrathink` keywords (4_000 / 10_000 / 31_999). `minimal` is the API floor;
-// `xhigh` exceeds Claude Code's ceiling for 64K-output models.
+// `xhigh` exceeds Claude Code's ceiling but stays under the 64K `max_tokens`
+// cap once `ANTHROPIC_OUTPUT_BUFFER` is added on top.
 const ANTHROPIC_BUDGETS: Record<Exclude<ThinkingLevel, 'off'>, number> = {
   minimal: 1_024,
   low: 4_000,
   medium: 10_000,
   high: 31_999,
-  xhigh: 60_000,
+  xhigh: 50_000,
 };
 const ANTHROPIC_OUTPUT_BUFFER = 4_096;
 
@@ -94,28 +95,39 @@ function toWire(messages: Message[]): {
     }
 
     if (msg.role === 'assistant') {
-      wireMessages.push({
-        role: 'assistant',
-        content: msg.content.map((part): AnthropicWireContent => {
-          if (part.type === 'text') return { type: 'text', text: part.text };
-          if (part.type === 'thinking') {
-            if (part.redactedData !== undefined) {
-              return { type: 'redacted_thinking', data: part.redactedData };
-            }
-            return {
+      const content: AnthropicWireContent[] = [];
+      for (const part of msg.content) {
+        if (part.type === 'text') {
+          content.push({ type: 'text', text: part.text });
+          continue;
+        }
+        if (part.type === 'thinking') {
+          // Only emit thinking blocks the model itself signed (or marked
+          // redacted). Unsigned parts — usually hand-constructed or imported
+          // from another provider — cannot be replayed: Anthropic rejects
+          // `thinking` blocks without a valid signature.
+          if (part.redactedData !== undefined) {
+            content.push({
+              type: 'redacted_thinking',
+              data: part.redactedData,
+            });
+          } else if (part.signature !== undefined && part.signature !== '') {
+            content.push({
               type: 'thinking',
               thinking: part.text,
-              signature: part.signature ?? '',
-            };
+              signature: part.signature,
+            });
           }
-          return {
-            type: 'tool_use',
-            id: part.toolCallId,
-            name: part.toolName,
-            input: part.input,
-          };
-        }),
-      });
+          continue;
+        }
+        content.push({
+          type: 'tool_use',
+          id: part.toolCallId,
+          name: part.toolName,
+          input: part.input,
+        });
+      }
+      wireMessages.push({ role: 'assistant', content });
       continue;
     }
 

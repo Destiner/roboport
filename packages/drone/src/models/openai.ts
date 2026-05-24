@@ -238,11 +238,10 @@ class OpenAIModel extends OpenAICompatibleModel {
 
   protected override applyThinking(body: Record<string, unknown>): void {
     if (this.thinking === 'off') return;
-    // Chat Completions API accepts `reasoning_effort` with the same string
-    // values Codex uses (sans `xhigh`, which is Responses-only on Codex models).
-    // We pass the level through; the API rejects unsupported values for the
-    // chosen model.
-    body.reasoning_effort = this.thinking;
+    // Chat Completions caps `reasoning_effort` at `high` — `xhigh` is
+    // Responses-only on Codex models. Clamp instead of passing through so
+    // GPT-5 (non-Codex) requests don't error.
+    body.reasoning_effort = this.thinking === 'xhigh' ? 'high' : this.thinking;
   }
 
   override async searchWeb(
