@@ -20,16 +20,16 @@ const incidentTriage = new Skill({
 });
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' }),
+  model: new AnthropicModel('claude-opus-4-7', { thinking: 'low' }),
   prompt: 'You are an on-call triage agent.',
   tools: claudeCode.tools,
   skills: [incidentTriage],
   mcp: [
     new Grafana({
-      url: process.env.GRAFANA_URL!,
-      serviceAccountToken: process.env.GRAFANA_TOKEN!,
+      url: process.env.GRAFANA_URL,
+      serviceAccountToken: process.env.GRAFANA_TOKEN,
     }),
-    new Linear({ apiKey: process.env.LINEAR_API_KEY! }),
+    new Linear({ apiKey: process.env.LINEAR_API_KEY }),
   ],
 });
 
