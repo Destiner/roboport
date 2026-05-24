@@ -225,8 +225,10 @@ class OpenAIModel extends OpenAICompatibleModel {
   override async createMessage(
     params: CreateMessageParams,
   ): Promise<CreateMessageResponse> {
-    if (!this.codexAuth) return super.createMessage(params);
-    return this.createCodexMessage(params);
+    if (this.codexAuth || isResponsesOnlyModel(this.modelName)) {
+      return this.createResponsesMessage(params);
+    }
+    return super.createMessage(params);
   }
 
   override async searchWeb(
@@ -234,7 +236,7 @@ class OpenAIModel extends OpenAICompatibleModel {
     opts?: SearchOptions,
   ): Promise<SearchHit[]> {
     if (this.codexAuth) {
-      const json = await this.fetchCodexResponses({
+      const json = await this.fetchResponses({
         model: this.modelName,
         stream: true,
         tools: [{ type: 'web_search_preview' }],
@@ -302,14 +304,14 @@ class OpenAIModel extends OpenAICompatibleModel {
     return hits;
   }
 
-  private async createCodexMessage(
+  private async createResponsesMessage(
     params: CreateMessageParams,
   ): Promise<CreateMessageResponse> {
-    if (params.maxTokens !== undefined) {
+    if (this.codexAuth && params.maxTokens !== undefined) {
       throw new Error('OpenAI Codex auth does not support maxTokens.');
     }
 
-    const { messages, tools } = params;
+    const { messages, tools, maxTokens } = params;
     const { instructions, input } = responsesMessageInput(messages);
     const wireTools = responsesTools(tools);
     const body: Record<string, unknown> = {
@@ -320,29 +322,20 @@ class OpenAIModel extends OpenAICompatibleModel {
     };
     body.instructions = instructions ?? 'You are a helpful assistant.';
     if (wireTools) body.tools = wireTools;
+    if (!this.codexAuth && maxTokens !== undefined) {
+      body.max_output_tokens = maxTokens;
+    }
 
-    const json = await this.fetchCodexResponses(body);
+    const json = await this.fetchResponses(body);
     return parseCodexResponse(json);
   }
 
-  private async fetchCodexResponses(
+  private async fetchResponses(
     body: Record<string, unknown>,
   ): Promise<ResponsesJson> {
-    if (!this.codexAuth) {
-      throw new Error('OpenAI Codex auth is not configured.');
-    }
-    const auth = await this.codexAuth.getHeaders();
-    const headers: Record<string, string> = {
-      authorization: auth.authorization,
-      'chatgpt-account-id': auth.accountId,
-      originator: 'drone',
-      'openai-beta': 'responses=experimental',
-      accept: 'application/json',
-      'content-type': 'application/json',
-    };
-    if (auth.isFedrampAccount) headers['x-openai-fedramp'] = 'true';
+    const { url, headers } = await this.responsesEndpoint();
 
-    const response = await fetch(`${this.codexAuth.baseUrl}/responses`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -350,7 +343,7 @@ class OpenAIModel extends OpenAICompatibleModel {
 
     if (!response.ok) {
       throw new Error(
-        `OpenAI Codex Responses error ${response.status}: ${await response.text()}`,
+        `OpenAI Responses error ${response.status}: ${await response.text()}`,
       );
     }
 
@@ -359,6 +352,38 @@ class OpenAIModel extends OpenAICompatibleModel {
 
     return (await response.json()) as ResponsesJson;
   }
+
+  private async responsesEndpoint(): Promise<{
+    url: string;
+    headers: Record<string, string>;
+  }> {
+    if (this.codexAuth) {
+      const auth = await this.codexAuth.getHeaders();
+      const headers: Record<string, string> = {
+        authorization: auth.authorization,
+        'chatgpt-account-id': auth.accountId,
+        originator: 'drone',
+        'openai-beta': 'responses=experimental',
+        accept: 'application/json',
+        'content-type': 'application/json',
+      };
+      if (auth.isFedrampAccount) headers['x-openai-fedramp'] = 'true';
+      return { url: `${this.codexAuth.baseUrl}/responses`, headers };
+    }
+
+    return {
+      url: `${this.baseUrl}/responses`,
+      headers: {
+        authorization: `Bearer ${this.apiKey}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+    };
+  }
+}
+
+function isResponsesOnlyModel(modelName: string): boolean {
+  return modelName.includes('codex');
 }
 
 function parseResponsesStream(raw: string): ResponsesJson {
