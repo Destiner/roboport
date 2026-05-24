@@ -26,7 +26,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` primitives, plus provider-agnostic message types
   - `src/models/` - `Model` adapters (Anthropic, Google, Moonshot, OpenAI, OpenAI-compatible); OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
-  - `src/harness/` - `Harness` bundle and Claude Code preset
+  - `src/harness/` - `claudeCode`, `codex`, and `pi` harness presets
   - `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`, `code-simplifier`); each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitive (`cron`, GitHub/Grafana/Linear webhook receivers)
   - `examples/` - Standalone usage examples
