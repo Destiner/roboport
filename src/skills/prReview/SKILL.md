@@ -26,6 +26,8 @@ Load just enough to ground judgement:
 
 Do not pre-read the whole repo. Open files as questions arise during the scan.
 
+Do not run the project's lint, typecheck, or test commands. CI already runs them on the same diff, and their output is not more informative than the diff itself.
+
 ## Reading the diff
 
 Three passes. Single-pass review misses things and over-flags.
