@@ -17,8 +17,8 @@
   },
   "scripts": {
     "check": "bun run check:prettier && bun run check:eslint",
-    "check:prettier": "prettier -c \"src/**/*.{json,js,ts}\"",
-    "check:eslint": "eslint \"src/**/*.{js,ts}\"",
+    "check:prettier": "prettier -c \"{src,examples}/**/*.{json,js,ts}\"",
+    "check:eslint": "eslint \"{src,examples}/**/*.{js,ts}\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
