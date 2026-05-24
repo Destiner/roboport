@@ -21,6 +21,8 @@
     "typescript-eslint": "^8.59.4"
   },
   "resolutions": {
-    "@vitejs/plugin-rsc": "0.5.19"
+    "@vitejs/plugin-rsc": "0.5.19",
+    "vite": "7.3.3",
+    "waku": "1.0.0-alpha.6"
   }
 }
