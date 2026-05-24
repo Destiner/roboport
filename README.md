@@ -53,6 +53,29 @@ bun run check
 bun run typecheck
 ```
 
+## OpenAI Auth
+
+OpenAI API billing remains the default:
+
+```ts
+new OpenAIModel('gpt-5.4', {
+  auth: { type: 'apiKey', apiKey: process.env.OPENAI_API_KEY },
+});
+```
+
+To use ChatGPT/Codex subscription auth, sign in with Codex locally and reuse
+its auth file:
+
+```ts
+new OpenAIModel('gpt-5.4-mini', {
+  auth: { type: 'codex' },
+});
+```
+
+Codex auth lookup checks `DRONE_OPENAI_CODEX_AUTH_FILE`,
+`CODEX_HOME/auth.json`, `~/.codex/auth.json`, then
+`~/.drone/openai-codex-auth.json`.
+
 ## Status
 
 Early. Experimental. APIs will change.
