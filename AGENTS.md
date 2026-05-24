@@ -28,9 +28,9 @@ No test suite yet.
 
 ## Patterns
 
-- Tools accept either a Zod `inputSchema` or a raw `jsonSchema`; the `Tool` constructor has overloads for both (`src/core/tool.ts:90`).
-- Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `src/core/tool.ts:124`.
-- Every `Model` adapter extends the abstract class in `src/core/model.ts:13` and converts to/from the wire format internally.
+- Tools accept either a Zod `inputSchema` or a raw `jsonSchema`; the `Tool` constructor has overloads for both (`src/core/tool.ts`).
+- Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `src/core/tool.ts`.
+- Every `Model` adapter extends the abstract class in `src/core/model.ts` and converts to/from the wire format internally.
 
 ## Conventions
 
