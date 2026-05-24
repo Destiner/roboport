@@ -7,9 +7,10 @@ WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml tsconfig.json ./
 COPY apps/bot/package.json ./apps/bot/
+COPY apps/docs/package.json ./apps/docs/
 COPY packages/drone/package.json ./packages/drone/
 
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --filter '@drone/bot'
 
 COPY packages/drone ./packages/drone
 COPY apps/bot ./apps/bot
