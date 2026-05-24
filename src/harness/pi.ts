@@ -2,25 +2,10 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { Tool, type ToolContext } from '@/core';
+import { Tool } from '@/core';
 
 import { Harness } from './core';
-import {
-  applyExactReplacements,
-  bash as sharedBash,
-  read as sharedRead,
-  write as sharedWrite,
-} from './shared';
-
-async function executeAsString(
-  tool: Tool,
-  input: unknown,
-  ctx: ToolContext,
-): Promise<string> {
-  const output = await tool.execute(input, ctx);
-  if (typeof output === 'string') return output;
-  return JSON.stringify(output);
-}
+import { applyExactReplacements, readFile, runShell } from './shared';
 
 const read = new Tool({
   name: 'read',
@@ -43,16 +28,11 @@ const read = new Tool({
       .optional()
       .describe('Maximum number of lines to read'),
   }),
-  execute: ({ path, offset, limit }, ctx): Promise<string> =>
-    executeAsString(
-      sharedRead,
-      {
-        file_path: resolve(path),
-        offset: offset === undefined ? undefined : offset - 1,
-        limit,
-      },
-      ctx,
-    ),
+  execute: ({ path, offset, limit }): Promise<string> =>
+    readFile(resolve(path), {
+      offset: offset === undefined ? undefined : offset - 1,
+      limit,
+    }),
 });
 
 const write = new Tool({
@@ -65,8 +45,11 @@ const write = new Tool({
       .describe('Path to the file to write (relative or absolute)'),
     content: z.string().describe('Content to write to the file'),
   }),
-  execute: ({ path, content }, ctx): Promise<string> =>
-    executeAsString(sharedWrite, { file_path: resolve(path), content }, ctx),
+  execute: async ({ path, content }): Promise<string> => {
+    const filePath = resolve(path);
+    await Bun.write(filePath, content);
+    return `Wrote ${filePath}.`;
+  },
 });
 
 const editSchema = z.object({
@@ -114,15 +97,11 @@ const bash = new Tool({
       .optional()
       .describe('Timeout in seconds (optional, no default timeout)'),
   }),
-  execute: ({ command, timeout }, ctx): Promise<string> =>
-    executeAsString(
-      sharedBash,
-      {
-        command,
-        timeout: timeout === undefined ? undefined : timeout * 1000,
-      },
-      ctx,
-    ),
+  execute: ({ command, timeout }): Promise<string> =>
+    runShell({
+      cmd: command,
+      timeout: timeout === undefined ? undefined : timeout * 1000,
+    }),
 });
 
 const system = `You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.
