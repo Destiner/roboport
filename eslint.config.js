@@ -53,11 +53,7 @@ export default [
       'import-x/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: [
-            'eslint.config.js',
-            'vite.config.ts',
-            'test/**/*.test.ts',
-          ],
+          devDependencies: ['eslint.config.js', 'test/**/*.test.ts'],
         },
       ],
       '@typescript-eslint/explicit-function-return-type': 'error',
