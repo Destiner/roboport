@@ -53,6 +53,22 @@ bun run check
 bun run typecheck
 ```
 
+## GitHub webhooks
+
+`githubTrigger` requires the webhook secret from your GitHub webhook settings. It verifies `x-hub-signature-256` before dispatching events.
+
+```ts
+import { githubTrigger } from 'drone/triggers';
+
+const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET! });
+
+agent.on(github.pullRequest({ actions: ['opened', 'synchronize'] }), {
+  prompt: (event) => `Review PR #${event.number}: ${event.pull_request.title}`,
+});
+
+Bun.serve({ port: 8080, fetch: (req) => github.handle(req) });
+```
+
 ## Models
 
 `OpenAIModel` uses `OPENAI_API_KEY` by default. You can also pass `auth: { type: 'apiKey', apiKey }`.
