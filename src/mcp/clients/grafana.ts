@@ -2,7 +2,7 @@ import { Tool, type McpClient } from '@/core';
 
 import { BearerAuth, type AuthProvider } from '../auth';
 
-type GrafanaMcpOptions = {
+type Options = {
   url: string;
   serviceAccountToken: string;
   name?: string;
@@ -181,13 +181,13 @@ async function request(
   }
 }
 
-class GrafanaMcp implements McpClient {
+class Mcp implements McpClient {
   private baseUrl: string;
   private auth: AuthProvider;
   private nameSpace: string;
   private deferred: boolean;
 
-  constructor(opts: GrafanaMcpOptions) {
+  constructor(opts: Options) {
     this.baseUrl = opts.url.replace(/\/$/, '');
     this.auth = new BearerAuth(opts.serviceAccountToken);
     this.nameSpace = opts.name ?? 'grafana';
@@ -215,8 +215,4 @@ class GrafanaMcp implements McpClient {
   async disconnect(): Promise<void> {}
 }
 
-function grafanaMcp(opts: GrafanaMcpOptions): GrafanaMcp {
-  return new GrafanaMcp(opts);
-}
-
-export default grafanaMcp;
+export default Mcp;

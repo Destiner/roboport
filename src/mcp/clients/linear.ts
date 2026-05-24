@@ -1,17 +1,24 @@
 import { BearerAuth } from '../auth';
-import { Mcp } from '../core';
+import { Mcp as McpBase } from '../core';
+
+type Options = {
+  apiKey: string;
+  name?: string;
+};
 
 const LINEAR_MCP_URL = 'https://mcp.linear.app/mcp';
 
-function linearMcp(opts: { apiKey: string; name?: string }): Mcp {
-  return new Mcp({
-    name: opts.name ?? 'linear',
-    transport: {
-      type: 'http',
-      url: LINEAR_MCP_URL,
-      auth: new BearerAuth(opts.apiKey),
-    },
-  });
+class Mcp extends McpBase {
+  constructor(opts: Options) {
+    super({
+      name: opts.name ?? 'linear',
+      transport: {
+        type: 'http',
+        url: LINEAR_MCP_URL,
+        auth: new BearerAuth(opts.apiKey),
+      },
+    });
+  }
 }
 
-export default linearMcp;
+export default Mcp;

@@ -10,7 +10,7 @@ Composable primitives with sane defaults. Bring your own models, tools, skills; 
 import { Agent, Skill } from '@/core';
 import { claudeCode } from '@/harness';
 import { AnthropicModel } from '@/models';
-import { grafanaMcp, linearMcp } from '@/mcp';
+import { Grafana, Linear } from '@/mcp';
 import { grafanaTrigger } from '@/triggers';
 
 const incidentTriage = new Skill({
@@ -25,11 +25,11 @@ const agent = new Agent({
   tools: claudeCode.tools,
   skills: [incidentTriage],
   mcp: [
-    grafanaMcp({
+    new Grafana({
       url: process.env.GRAFANA_URL!,
       serviceAccountToken: process.env.GRAFANA_TOKEN!,
     }),
-    linearMcp({ apiKey: process.env.LINEAR_API_KEY! }),
+    new Linear({ apiKey: process.env.LINEAR_API_KEY! }),
   ],
 });
 
