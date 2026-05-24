@@ -59,9 +59,11 @@ These destroy signal-to-noise:
 
 ## Output
 
-Markdown, three sections, all optional — omit any that's empty:
+Markdown. Lead with one line summarising the change (the same summary from the skim pass) — always, even when there are no findings. Then up to three sections, all optional — omit any that's empty:
 
 ```
+<one-line summary of the change>
+
 ## Must fix
 - <statement>. `path/to/file.ts:42` — <suggested replacement *or* a question>
 
