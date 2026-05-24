@@ -29,7 +29,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`, `code-simplifier`); each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitive (`cron`, GitHub/Grafana/Linear webhook receivers)
   - `examples/` - Standalone usage examples
-- `.github/workflows/` + `scripts/` - PR automation; `docs-update.yaml` runs `scripts/docs-update.ts` to sync internal docs and commit with `[skip ci]`
+- `apps/bot/` - Webhook-driven runner. Hono server mounts `GithubReceiver` at `POST /webhooks/github`, dispatches `pr-review` and `docs-update` workflows per actionable PR event. Deployed to Railway via `apps/bot/Dockerfile`; codex auth/refresh tokens persist on a mounted volume.
 
 ## Patterns
 

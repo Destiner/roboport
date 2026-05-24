@@ -1,0 +1,14 @@
+{
+  "name": "@drone/bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "drone": "workspace:*",
+    "hono": "^4.0.0"
+  }
+}
