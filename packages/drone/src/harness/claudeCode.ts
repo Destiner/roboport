@@ -306,7 +306,7 @@ const grep = new Tool({
       for (const g of globs) cmd.push(`--include=${g}`);
     }
 
-    cmd.push('--', args.pattern, args.path ?? ctx.cwd);
+    cmd.push('--', args.pattern, args.path ?? '.');
 
     const proc = Bun.spawn(cmd, {
       cwd: ctx.cwd,
