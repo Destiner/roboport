@@ -37,6 +37,21 @@ const ANTHROPIC_BUDGETS: Record<Exclude<ThinkingLevel, 'off'>, number> = {
 };
 const ANTHROPIC_OUTPUT_BUFFER = 4_096;
 
+// Opus 4.7 and later only accept the adaptive thinking format with an effort
+// level in `output_config`. Older models keep the legacy enabled+budget shape.
+const ADAPTIVE_THINKING_MODELS = new Set<string>(['claude-opus-4-7']);
+
+const ADAPTIVE_EFFORTS: Record<
+  Exclude<ThinkingLevel, 'off'>,
+  'minimal' | 'low' | 'medium' | 'high'
+> = {
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'high',
+};
+
 type AnthropicWireContent =
   | { type: 'text'; text: string }
   | {
@@ -177,8 +192,11 @@ class AnthropicModel extends Model {
       input_schema: tool.toJsonSchema(),
     }));
 
+    const useAdaptive = ADAPTIVE_THINKING_MODELS.has(this.modelName);
     const budget =
-      this.thinking === 'off' ? undefined : ANTHROPIC_BUDGETS[this.thinking];
+      this.thinking === 'off' || useAdaptive
+        ? undefined
+        : ANTHROPIC_BUDGETS[this.thinking];
     // Anthropic requires max_tokens > budget_tokens; keep at least
     // ANTHROPIC_OUTPUT_BUFFER tokens of room for the actual response.
     const effectiveMaxTokens =
@@ -195,6 +213,9 @@ class AnthropicModel extends Model {
     if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
     if (budget !== undefined) {
       body.thinking = { type: 'enabled', budget_tokens: budget };
+    } else if (useAdaptive && this.thinking !== 'off') {
+      body.thinking = { type: 'adaptive' };
+      body.output_config = { effort: ADAPTIVE_EFFORTS[this.thinking] };
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
