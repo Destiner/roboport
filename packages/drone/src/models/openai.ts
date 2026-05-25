@@ -398,6 +398,7 @@ class OpenAIModel extends OpenAICompatibleModel {
     let inputTokens = 0;
     let outputTokens = 0;
     let sawToolCall = false;
+    let sawCompleted = false;
     let textOpen = false;
     let thinkingOpen = false;
 
@@ -493,6 +494,7 @@ class OpenAIModel extends OpenAICompatibleModel {
       }
 
       if (event.type === 'response.completed') {
+        sawCompleted = true;
         if (!id && event.response.id) id = event.response.id;
         stopReason = sawToolCall
           ? 'tool_use'
@@ -507,6 +509,12 @@ class OpenAIModel extends OpenAICompatibleModel {
           event.response?.error?.message ?? 'OpenAI Responses stream failed.',
         );
       }
+    }
+
+    if (!sawCompleted) {
+      throw new Error(
+        'OpenAI Responses stream ended before response.completed; response is truncated.',
+      );
     }
 
     yield {

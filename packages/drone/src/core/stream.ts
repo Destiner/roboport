@@ -30,8 +30,9 @@ type ModelStreamEvent =
 type AssistantContentPart = TextPart | ThinkingPart | ToolCallPart;
 
 // Reads an SSE stream from a fetch Response, yielding each parsed `data:` JSON
-// payload. Skips heartbeat lines and `[DONE]` sentinels. Adapters layer
-// protocol-specific decoding on top.
+// payload. Skips heartbeat lines and `[DONE]` sentinels. Throws on malformed
+// JSON or a truncated trailing event so adapters can surface stream corruption
+// rather than emit a silent partial turn.
 async function* readSse(response: Response): AsyncGenerator<unknown> {
   if (!response.body) {
     throw new Error('Response body is empty; cannot stream.');
@@ -40,31 +41,55 @@ async function* readSse(response: Response): AsyncGenerator<unknown> {
   const decoder = new TextDecoder();
   let buffer = '';
 
+  function* drain(): Generator<unknown> {
+    let sepIdx = findEventBoundary(buffer);
+    while (sepIdx !== -1) {
+      const rawEvent = buffer.slice(0, sepIdx.start);
+      buffer = buffer.slice(sepIdx.end);
+
+      const payload = extractDataPayload(rawEvent);
+      if (payload !== undefined) {
+        yield parsePayload(payload);
+      }
+
+      sepIdx = findEventBoundary(buffer);
+    }
+  }
+
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      yield* drain();
+    }
 
-      let sepIdx = findEventBoundary(buffer);
-      while (sepIdx !== -1) {
-        const rawEvent = buffer.slice(0, sepIdx.start);
-        buffer = buffer.slice(sepIdx.end);
+    buffer += decoder.decode();
+    yield* drain();
 
-        const payload = extractDataPayload(rawEvent);
-        if (payload !== undefined) {
-          try {
-            yield JSON.parse(payload);
-          } catch {
-            // Drop malformed chunks; the trailing message-end check catches truncation.
-          }
-        }
-
-        sepIdx = findEventBoundary(buffer);
+    if (buffer.trim().length > 0) {
+      const payload = extractDataPayload(buffer);
+      if (payload !== undefined) {
+        yield parsePayload(payload);
+      } else {
+        throw new Error(
+          `SSE stream ended with unterminated buffer: ${buffer.slice(0, 200)}`,
+        );
       }
     }
   } finally {
     reader.releaseLock();
+  }
+}
+
+function parsePayload(payload: string): unknown {
+  try {
+    return JSON.parse(payload);
+  } catch (error) {
+    throw new Error(
+      `Malformed SSE event payload: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
 }
 

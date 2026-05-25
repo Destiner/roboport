@@ -153,6 +153,7 @@ abstract class OpenAICompatibleModel extends Model {
     let textBuffer = '';
     let thinkingOpen = false;
     let thinkingBuffer = '';
+    let sawFinishReason = false;
     const toolBuilders = new Map<number, ToolCallBuilder>();
     const toolOrder: number[] = [];
 
@@ -216,7 +217,14 @@ abstract class OpenAICompatibleModel extends Model {
 
       if (choice.finish_reason) {
         stopReason = mapFinishReason(choice.finish_reason);
+        sawFinishReason = true;
       }
+    }
+
+    if (!sawFinishReason) {
+      throw new Error(
+        'Chat completions stream ended without finish_reason; response is truncated.',
+      );
     }
 
     if (textOpen) {

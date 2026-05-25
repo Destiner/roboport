@@ -109,6 +109,17 @@ class Turn implements AsyncIterable<TurnEvent>, PromiseLike<Message[]> {
         }
         return new Promise((resolve) => this.waiters.push(resolve));
       },
+      // Consumers may `break` out of `for await (...)` early. Abort the turn
+      // so the agent loop stops issuing model calls and tools instead of
+      // running to completion with no reader.
+      return: async (): Promise<IteratorResult<TurnEvent>> => {
+        this.abort('iteration ended');
+        await this.resultPromise.catch(() => {});
+        return {
+          value: undefined,
+          done: true,
+        } as IteratorResult<TurnEvent>;
+      },
     };
   }
 

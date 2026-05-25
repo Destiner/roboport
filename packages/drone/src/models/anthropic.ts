@@ -265,6 +265,7 @@ class AnthropicModel extends Model {
     let stopReason: StopReason = 'end_turn';
     let inputTokens = 0;
     let outputTokens = 0;
+    let sawMessageStop = false;
 
     for await (const raw of readSse(response)) {
       const event = raw as AnthropicStreamEvent;
@@ -368,11 +369,22 @@ class AnthropicModel extends Model {
         continue;
       }
 
+      if (event.type === 'message_stop') {
+        sawMessageStop = true;
+        continue;
+      }
+
       if (event.type === 'error') {
         throw new Error(
           event.error?.message ?? 'Anthropic stream returned an error.',
         );
       }
+    }
+
+    if (!sawMessageStop) {
+      throw new Error(
+        'Anthropic stream ended before message_stop; response is truncated.',
+      );
     }
 
     yield {

@@ -213,7 +213,13 @@ class Agent {
         return turn;
       },
       close: async (): Promise<void> => {
-        if (activeTurn) activeTurn.abort('session closed');
+        const pending = activeTurn;
+        if (pending) {
+          pending.abort('session closed');
+          // Wait for the in-flight loop to observe the abort and unwind
+          // (including any tool call mid-flight) before tearing down MCP.
+          await Promise.resolve(pending).catch(() => {});
+        }
         if (mcpConnected) {
           await Promise.all(this.mcp.map((mcp) => mcp.disconnect()));
           mcpConnected = false;
