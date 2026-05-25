@@ -146,7 +146,7 @@ const glob = new Tool({
       .describe('The directory to search in. Defaults to cwd if omitted.'),
   }),
   execute: async ({ pattern, path: searchPath }, ctx): Promise<string> => {
-    const cwd = searchPath ?? ctx.cwd;
+    const cwd = searchPath ? resolve(ctx.cwd, searchPath) : ctx.cwd;
     const scanner = new Bun.Glob(pattern);
     const matches: string[] = [];
     for await (const file of scanner.scan({ cwd, onlyFiles: true })) {
