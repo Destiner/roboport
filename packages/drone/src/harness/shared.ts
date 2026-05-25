@@ -1,5 +1,5 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
@@ -123,7 +123,10 @@ function consumePrefixedLine(
   return line.slice(prefix.length);
 }
 
-async function applyPatchText(patch: string): Promise<string> {
+async function applyPatchText(
+  patch: string,
+  opts?: { cwd?: string },
+): Promise<string> {
   const lines = patch.replace(/\r\n/g, '\n').split('\n');
   if (lines.at(-1) === '') lines.pop();
   if (lines[0] !== '*** Begin Patch') {
@@ -131,6 +134,11 @@ async function applyPatchText(patch: string): Promise<string> {
   }
   if (lines.at(-1) !== '*** End Patch') {
     throw new Error('Patch must end with "*** End Patch".');
+  }
+
+  const cwd = opts?.cwd;
+  function r(p: string): string {
+    return cwd ? resolve(cwd, p) : p;
   }
 
   const changed: string[] = [];
@@ -148,15 +156,16 @@ async function applyPatchText(patch: string): Promise<string> {
         content.push(line);
         index += 1;
       }
-      await mkdir(dirname(addFile), { recursive: true });
-      await writeFile(addFile, `${content.join('\n')}\n`);
+      const target = r(addFile);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, `${content.join('\n')}\n`);
       changed.push(`added ${addFile}`);
       continue;
     }
 
     const deleteFile = consumePrefixedLine(lines, index, '*** Delete File: ');
     if (deleteFile !== undefined) {
-      await rm(deleteFile);
+      await rm(r(deleteFile));
       changed.push(`deleted ${deleteFile}`);
       index += 1;
       continue;
@@ -171,7 +180,8 @@ async function applyPatchText(patch: string): Promise<string> {
     const moveTo = consumePrefixedLine(lines, index, '*** Move to: ');
     if (moveTo !== undefined) index += 1;
 
-    let content = await Bun.file(updateFile).text();
+    const updatePath = r(updateFile);
+    let content = await Bun.file(updatePath).text();
     while (index < lines.length - 1 && lines[index]?.startsWith('@@')) {
       index += 1;
       const oldLines: string[] = [];
@@ -209,14 +219,15 @@ async function applyPatchText(patch: string): Promise<string> {
         content.slice(first + oldText.length);
     }
 
-    const target = moveTo ?? updateFile;
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, content);
-    if (moveTo !== undefined) await rm(updateFile);
+    const targetLabel = moveTo ?? updateFile;
+    const targetPath = moveTo !== undefined ? r(moveTo) : updatePath;
+    await mkdir(dirname(targetPath), { recursive: true });
+    await writeFile(targetPath, content);
+    if (moveTo !== undefined) await rm(updatePath);
     changed.push(
       moveTo === undefined
-        ? `updated ${target}`
-        : `moved ${updateFile} to ${target}`,
+        ? `updated ${targetLabel}`
+        : `moved ${updateFile} to ${targetLabel}`,
     );
   }
 

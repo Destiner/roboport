@@ -63,7 +63,8 @@ const applyPatch = new Tool({
   inputSchema: z.object({
     patch: z.string().describe('The full apply_patch patch text.'),
   }),
-  execute: ({ patch }): Promise<string> => applyPatchText(patch),
+  execute: ({ patch }, ctx): Promise<string> =>
+    applyPatchText(patch, { cwd: ctx.cwd }),
 });
 
 const webSearch = new Tool({
