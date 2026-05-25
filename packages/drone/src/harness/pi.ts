@@ -97,10 +97,11 @@ const bash = new Tool({
       .optional()
       .describe('Timeout in seconds (optional, no default timeout)'),
   }),
-  execute: ({ command, timeout }): Promise<string> =>
+  execute: ({ command, timeout }, ctx): Promise<string> =>
     runShell({
       cmd: command,
       timeout: timeout === undefined ? undefined : timeout * 1000,
+      workdir: ctx.cwd,
     }),
 });
 

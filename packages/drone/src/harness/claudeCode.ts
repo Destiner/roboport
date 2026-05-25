@@ -38,13 +38,16 @@ const bash = new Tool({
       .optional()
       .describe('Set to true to run this command in the background.'),
   }),
-  execute: async ({ command, timeout, run_in_background }): Promise<string> => {
+  execute: async (
+    { command, timeout, run_in_background },
+    ctx,
+  ): Promise<string> => {
     if (run_in_background) {
       throw new Error(
         'run_in_background requires runtime support and is not implemented in this harness.',
       );
     }
-    return runShell({ cmd: command, timeout });
+    return runShell({ cmd: command, timeout, workdir: ctx.cwd });
   },
 });
 
@@ -142,8 +145,8 @@ const glob = new Tool({
       .optional()
       .describe('The directory to search in. Defaults to cwd if omitted.'),
   }),
-  execute: async ({ pattern, path: searchPath }): Promise<string> => {
-    const cwd = searchPath ?? process.cwd();
+  execute: async ({ pattern, path: searchPath }, ctx): Promise<string> => {
+    const cwd = searchPath ? resolve(ctx.cwd, searchPath) : ctx.cwd;
     const scanner = new Bun.Glob(pattern);
     const matches: string[] = [];
     for await (const file of scanner.scan({ cwd, onlyFiles: true })) {
@@ -242,7 +245,7 @@ const grep = new Tool({
         'Skip first N lines/entries before applying head_limit. Defaults to 0.',
       ),
   }),
-  execute: async (args): Promise<string> => {
+  execute: async (args, ctx): Promise<string> => {
     if (args.multiline) {
       throw new Error(
         'multiline mode is not supported by grep. Install ripgrep for this feature.',
@@ -305,7 +308,11 @@ const grep = new Tool({
 
     cmd.push('--', args.pattern, args.path ?? '.');
 
-    const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' });
+    const proc = Bun.spawn(cmd, {
+      cwd: ctx.cwd,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
     const [stdout, stderr] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),

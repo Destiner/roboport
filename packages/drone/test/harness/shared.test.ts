@@ -36,6 +36,7 @@ function makeCtx(tools: Tool[]): ToolContext {
     },
     session: { messages: [], store: new Map() },
     tools: createRegistry(tools),
+    cwd: process.cwd(),
   };
 }
 

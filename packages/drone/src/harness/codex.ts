@@ -37,21 +37,16 @@ const execCommand = new Tool({
       .optional()
       .describe('Approximate maximum output tokens to return.'),
   }),
-  execute: async ({
-    cmd,
-    workdir,
-    shell,
-    login,
-    tty,
-    yield_time_ms,
-    max_output_tokens,
-  }): Promise<string> => {
+  execute: async (
+    { cmd, workdir, shell, login, tty, yield_time_ms, max_output_tokens },
+    ctx,
+  ): Promise<string> => {
     if (tty) {
       throw new Error('tty requires runtime support and is not implemented.');
     }
     const output = await runShell({
       cmd,
-      workdir,
+      workdir: workdir ?? ctx.cwd,
       shell,
       login,
       timeout: yield_time_ms,
@@ -68,7 +63,8 @@ const applyPatch = new Tool({
   inputSchema: z.object({
     patch: z.string().describe('The full apply_patch patch text.'),
   }),
-  execute: ({ patch }): Promise<string> => applyPatchText(patch),
+  execute: ({ patch }, ctx): Promise<string> =>
+    applyPatchText(patch, { cwd: ctx.cwd }),
 });
 
 const webSearch = new Tool({
