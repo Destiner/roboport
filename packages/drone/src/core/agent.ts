@@ -34,6 +34,7 @@ class Agent {
   tools: Tool[];
   skills: Skill[];
   mcp: McpClient[];
+  cwd?: string;
   private registrations: Registration[] = [];
   private unsubs: Unsub[] = [];
 
@@ -43,18 +44,21 @@ class Agent {
     tools,
     skills,
     mcp,
+    cwd,
   }: {
     model: Model;
     prompt: string;
     tools: Tool[];
     skills: Skill[];
     mcp?: McpClient[];
+    cwd?: string;
   }) {
     this.model = model;
     this.prompt = prompt;
     this.tools = tools;
     this.skills = skills;
     this.mcp = mcp ?? [];
+    this.cwd = cwd;
   }
 
   on<T>(trigger: Trigger<T>, handler: TriggerHandler<T>): void {
@@ -126,10 +130,11 @@ class Agent {
 
   // Build a fresh session, optionally seeded with a prior message history for
   // resumption. MCP connections are lazy — no I/O until the first send().
-  session(init?: { messages?: Message[] }): Session {
+  session(init?: { messages?: Message[]; cwd?: string }): Session {
     const initialMessages = init?.messages
       ? [...init.messages]
       : ([] as Message[]);
+    const sessionCwd = init?.cwd ?? this.cwd ?? process.cwd();
     const state: SessionState = {
       messages: initialMessages,
       store: new Map(),
@@ -170,6 +175,7 @@ class Agent {
             this.model.searchWeb(query, opts),
           session: state,
           tools: registry,
+          cwd: sessionCwd,
         };
         // Seed the message log with the system prompt once we know the tool set.
         if (

@@ -54,6 +54,10 @@ interface ToolContext {
   searchWeb(query: string, opts?: SearchOptions): Promise<SearchHit[]>;
   session: SessionState;
   tools: ToolRegistry;
+  // Workspace directory the agent is scoped to. Built-in shell and search
+  // tools use this as their default working directory; user tools may consult
+  // it to resolve workspace-relative paths. Falls back to `process.cwd()`.
+  cwd: string;
 }
 
 type ZodToolInit<TSchema extends z.ZodTypeAny, TResult> = {
