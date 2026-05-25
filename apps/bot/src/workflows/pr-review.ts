@@ -36,8 +36,8 @@ Review PR #${number} in ${repo}.
    - cd repo && gh pr checkout ${number}
 2. Apply the pr-review skill.
 3. Post your findings to GitHub (you are authorized):
-   - One inline comment per line-level finding via gh api repos/${repo}/pulls/${number}/comments
-   - A summary review via \`gh pr review ${number} --comment\`. Always use --comment; never --approve or --request-changes (GitHub refuses both on the PAT owner's own PRs). Use the output format from the pr-review skill verbatim (overview → findings → verdict).
+   - First, the summary review via \`gh pr review ${number} --comment\`. Always use --comment; never --approve or --request-changes (GitHub refuses both on the PAT owner's own PRs). Use the output format from the pr-review skill verbatim (overview → findings → verdict).
+   - Then, one inline comment per line-level finding via gh api repos/${repo}/pulls/${number}/comments.
    Skip inline comments if there are no line-level findings.
 
 The GH_TOKEN env var is set and gh is authenticated.`;
