@@ -7,22 +7,52 @@
   },
   "license": "UNLICENSED",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./harness": "./src/harness/index.ts",
-    "./mcp": "./src/mcp/index.ts",
-    "./models": "./src/models/index.ts",
-    "./skills": "./src/skills/index.ts",
-    "./triggers": "./src/triggers/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./harness": {
+      "types": "./dist/harness/index.d.ts",
+      "import": "./dist/harness/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
+    },
+    "./models": {
+      "types": "./dist/models/index.d.ts",
+      "import": "./dist/models/index.js"
+    },
+    "./skills": {
+      "types": "./dist/skills/index.d.ts",
+      "import": "./dist/skills/index.js"
+    },
+    "./triggers": {
+      "types": "./dist/triggers/index.d.ts",
+      "import": "./dist/triggers/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "check": "bun run check:prettier && bun run check:eslint",
     "check:prettier": "prettier -c \"**/*.{json,js,ts}\"",
     "check:eslint": "eslint \"**/*.{js,ts}\"",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && bun run build:js && bun run build:types",
+    "build:js": "bun build ./src/index.ts ./src/harness/index.ts ./src/mcp/index.ts ./src/models/index.ts ./src/skills/index.ts ./src/triggers/index.ts --outdir ./dist --target bun --external zod --root ./src",
+    "build:types": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
+    "prepack": "bun run build"
   },
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsc-alias": "^1.8.17"
   }
 }
