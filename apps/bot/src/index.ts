@@ -2,8 +2,11 @@ import { githubTrigger, type PullRequestEvent } from 'drone/triggers';
 import { Hono } from 'hono';
 
 import { loadConfig } from './config';
-import { createDocsUpdateAgent, runDocsUpdate } from './workflows/docs-update';
-import { createPrReviewAgent, runPrReview } from './workflows/pr-review';
+import {
+  createDocsUpdateAgent,
+  handleDocsUpdate,
+} from './workflows/docs-update';
+import { createPrReviewAgent, handlePrReview } from './workflows/pr-review';
 
 const config = loadConfig();
 
@@ -36,21 +39,23 @@ function isEventActionable(event: PullRequestEvent): boolean {
 const prTrigger = ghReceiver.pullRequest({
   actions: ['opened', 'synchronize', 'reopened', 'ready_for_review'],
 });
-await prTrigger.start((event) => {
+
+prReviewAgent.on(prTrigger, async (event) => {
   if (!isEventActionable(event)) return;
   const tag = `${event.repository.full_name}#${event.number}`;
-  console.log(`[bot] dispatch ${tag} action=${event.action}`);
-  void runPrReview({ agent: prReviewAgent, event }).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bot] pr-review failed for ${tag}: ${message}`);
-  });
-  void runDocsUpdate({ agent: docsUpdateAgent, event, config }).catch(
-    (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[bot] docs-update failed for ${tag}: ${message}`);
-    },
-  );
+  console.log(`[bot] dispatch pr-review ${tag} action=${event.action}`);
+  await handlePrReview(prReviewAgent, event);
 });
+
+docsUpdateAgent.on(prTrigger, async (event) => {
+  if (!isEventActionable(event)) return;
+  const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[bot] dispatch docs-update ${tag} action=${event.action}`);
+  await handleDocsUpdate(docsUpdateAgent, event, config);
+});
+
+await prReviewAgent.start();
+await docsUpdateAgent.start();
 
 const app = new Hono();
 app.get('/', (c) => c.text('ok'));

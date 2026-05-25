@@ -54,23 +54,24 @@ Branch: ${headRef}. Base: origin/${baseRef}.
 Do not amend or force-push. Do not edit source files. The GH_TOKEN env var is set and gh is authenticated; git push works via gh's credential helper.`;
 }
 
-async function runDocsUpdate(opts: {
-  agent: Agent;
-  event: PullRequestEvent;
-  config: Config;
-}): Promise<void> {
+async function handleDocsUpdate(
+  agent: Agent,
+  event: PullRequestEvent,
+  config: Config,
+): Promise<void> {
+  const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-docs-update-'));
   try {
-    const session = await opts.agent.createSession({
-      prompt: buildPrompt(opts.event, workspace, opts.config),
+    const session = await agent.createSession({
+      prompt: buildPrompt(event, workspace, config),
     });
-    logMessages(
-      `docs-update:${opts.event.repository.full_name}#${opts.event.number}`,
-      session.messages,
-    );
+    logMessages(`docs-update:${tag}`, session.messages);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[bot] docs-update failed for ${tag}: ${message}`);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
 }
 
-export { createDocsUpdateAgent, runDocsUpdate };
+export { createDocsUpdateAgent, handleDocsUpdate };

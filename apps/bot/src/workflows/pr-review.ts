@@ -43,22 +43,23 @@ Review PR #${number} in ${repo}.
 The GH_TOKEN env var is set and gh is authenticated.`;
 }
 
-async function runPrReview(opts: {
-  agent: Agent;
-  event: PullRequestEvent;
-}): Promise<void> {
+async function handlePrReview(
+  agent: Agent,
+  event: PullRequestEvent,
+): Promise<void> {
+  const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-pr-review-'));
   try {
-    const session = await opts.agent.createSession({
-      prompt: buildPrompt(opts.event, workspace),
+    const session = await agent.createSession({
+      prompt: buildPrompt(event, workspace),
     });
-    logMessages(
-      `pr-review:${opts.event.repository.full_name}#${opts.event.number}`,
-      session.messages,
-    );
+    logMessages(`pr-review:${tag}`, session.messages);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[bot] pr-review failed for ${tag}: ${message}`);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
 }
 
-export { createPrReviewAgent, runPrReview };
+export { createPrReviewAgent, handlePrReview };

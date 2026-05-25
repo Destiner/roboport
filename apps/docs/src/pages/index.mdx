@@ -34,9 +34,10 @@ const agent = new Agent({
 });
 
 const grafana = grafanaTrigger();
-agent.on(grafana.alert({ status: 'firing' }), {
-  prompt: (alert) =>
-    `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
+agent.on(grafana.alert({ status: 'firing' }), async (alert) => {
+  await agent.createSession({
+    prompt: `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
+  });
 });
 
 await agent.start();

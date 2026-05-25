@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Subscription, Trigger, Unsub } from '@/triggers/core';
+import type { Trigger, TriggerHandler, Unsub } from '@/triggers/core';
 
 import type { McpClient } from './mcp';
 import type { TextPart, ToolCallPart, ToolResultPart } from './message';
@@ -16,7 +16,7 @@ import {
 
 interface Registration<T = unknown> {
   trigger: Trigger<T>;
-  subscription: Subscription<T>;
+  handler: TriggerHandler<T>;
 }
 
 class Agent {
@@ -48,29 +48,22 @@ class Agent {
     this.mcp = mcp ?? [];
   }
 
-  on<T>(trigger: Trigger<T>, subscription: Subscription<T>): void {
-    this.registrations.push({
-      trigger,
-      subscription,
-    } as Registration);
+  on<T>(trigger: Trigger<T>, handler: TriggerHandler<T>): void {
+    this.registrations.push({ trigger, handler } as Registration);
   }
 
   async start(): Promise<void> {
-    for (const { trigger, subscription } of this.registrations) {
-      const unsub = await trigger.start(async (event) => {
-        try {
-          const prompt =
-            typeof subscription.prompt === 'function'
-              ? await subscription.prompt(event)
-              : subscription.prompt;
-          await this.createSession({ prompt });
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          console.error(
-            `[drone] trigger "${trigger.name}" handler failed: ${message}`,
-          );
-        }
+    for (const { trigger, handler } of this.registrations) {
+      const unsub = await trigger.start((event) => {
+        void Promise.resolve()
+          .then(() => handler(event))
+          .catch((error: unknown) => {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            console.error(
+              `[drone] trigger "${trigger.name}" handler failed: ${message}`,
+            );
+          });
       });
       this.unsubs.push(unsub);
     }
