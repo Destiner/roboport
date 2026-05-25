@@ -38,7 +38,8 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 - Tools accept either a Zod `inputSchema` or a raw `jsonSchema`; the `Tool` constructor has overloads for both (`packages/drone/src/core/tool.ts`).
 - Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `packages/drone/src/core/tool.ts`.
 - Trigger handlers registered with `Agent.on` receive the event and call `agent.createSession(...)` when they want to run the agent (`packages/drone/src/core/agent.ts`).
-- Every `Model` adapter extends the abstract class in `packages/drone/src/core/model.ts` and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings.
+- The root `drone` export re-exports core primitives and message/session/tool registry types from `packages/drone/src/core/` (`packages/drone/src/index.ts`).
+- Every `Model` adapter extends the abstract class in `packages/drone/src/core/model.ts` and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 uses adaptive thinking instead of budget tokens.
 
 ## Conventions
 
