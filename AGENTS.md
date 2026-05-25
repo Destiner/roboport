@@ -7,6 +7,7 @@ Minimal TypeScript framework for building LLM agents.
 - `bun install` - Install dependencies
 - `bun run check` - Prettier + ESLint
 - `bun run typecheck`
+- `bun --filter drone build` - Build the framework package into `dist`
 - `bun --filter drone test` - Run the framework package unit tests
 - `bun run docs` - Start the docs site
 
@@ -21,7 +22,7 @@ Minimal TypeScript framework for building LLM agents.
 
 Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable services.
 
-- `packages/drone/` - the framework package (`name: "drone"`); subpath exports for `harness`, `mcp`, `models`, `skills`, `triggers`
+- `packages/drone/` - the framework package (`name: "drone"`); publishes `dist` entrypoints and subpath exports for `harness`, `mcp`, `models`, `skills`, `triggers`
   - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` primitives, plus provider-agnostic message types
   - `src/models/` - `Model` adapters (Anthropic, Google, Moonshot, OpenAI, OpenAI-compatible); OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
