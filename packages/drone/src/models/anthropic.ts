@@ -1,17 +1,15 @@
 import {
   Model,
   type CreateMessageParams,
-  type CreateMessageResponse,
   type LiteralUnion,
   type Message,
+  type ModelStreamEvent,
   type SearchHit,
   type SearchOptions,
   type StopReason,
-  type TextPart,
   type ThinkingLevel,
-  type ThinkingPart,
-  type ToolCallPart,
 } from '@/core';
+import { readSse } from '@/core/stream';
 import { env } from '@/env';
 
 const ANTHROPIC_MODELS = [
@@ -64,6 +62,52 @@ interface WebSearchResultBlock {
   title: string;
   page_age?: string | null;
   encrypted_content?: string;
+}
+
+type AnthropicStreamEvent =
+  | {
+      type: 'message_start';
+      message: {
+        id: string;
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
+    }
+  | {
+      type: 'content_block_start';
+      index: number;
+      content_block:
+        | { type: 'text'; text?: string }
+        | { type: 'thinking'; thinking?: string }
+        | { type: 'redacted_thinking'; data: string }
+        | { type: 'tool_use'; id: string; name: string; input?: unknown };
+    }
+  | {
+      type: 'content_block_delta';
+      index: number;
+      delta:
+        | { type: 'text_delta'; text: string }
+        | { type: 'thinking_delta'; thinking: string }
+        | { type: 'signature_delta'; signature: string }
+        | { type: 'input_json_delta'; partial_json: string };
+    }
+  | { type: 'content_block_stop'; index: number }
+  | {
+      type: 'message_delta';
+      delta: { stop_reason?: StopReason };
+      usage?: { input_tokens?: number; output_tokens?: number };
+    }
+  | { type: 'message_stop' }
+  | { type: 'ping' }
+  | { type: 'error'; error?: { message?: string } };
+
+interface BlockBuilder {
+  kind: 'text' | 'thinking' | 'redacted_thinking' | 'tool_use';
+  text: string;
+  signature?: string;
+  redactedData?: string;
+  toolCallId?: string;
+  toolName?: string;
+  argsBuffer?: string;
 }
 
 function serializeToolOutput(output: unknown): string {
@@ -165,10 +209,10 @@ class AnthropicModel extends Model {
     this.thinking = options?.thinking ?? 'off';
   }
 
-  override async createMessage(
+  override async *streamMessage(
     params: CreateMessageParams,
-  ): Promise<CreateMessageResponse> {
-    const { messages, tools, maxTokens = 8192 } = params;
+  ): AsyncIterable<ModelStreamEvent> {
+    const { messages, tools, maxTokens = 8192, signal } = params;
     const { system, wireMessages } = toWire(messages);
 
     const wireTools = tools?.map((tool) => ({
@@ -190,6 +234,7 @@ class AnthropicModel extends Model {
       model: this.modelName,
       max_tokens: effectiveMaxTokens,
       messages: wireMessages,
+      stream: true,
     };
     if (system !== undefined) body.system = system;
     if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
@@ -203,8 +248,10 @@ class AnthropicModel extends Model {
         'content-type': 'application/json',
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
+        accept: 'text/event-stream',
       },
       body: JSON.stringify(body),
+      signal,
     });
 
     if (!response.ok) {
@@ -213,49 +260,138 @@ class AnthropicModel extends Model {
       );
     }
 
-    const json = (await response.json()) as {
-      id: string;
-      content: AnthropicWireContent[];
-      stop_reason: StopReason;
-      usage: { input_tokens: number; output_tokens: number };
-    };
+    const blocks = new Map<number, BlockBuilder>();
+    let id = '';
+    let stopReason: StopReason = 'end_turn';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let sawMessageStop = false;
 
-    const content: (TextPart | ThinkingPart | ToolCallPart)[] =
-      json.content.map((block) => {
+    for await (const raw of readSse(response)) {
+      const event = raw as AnthropicStreamEvent;
+
+      if (event.type === 'message_start') {
+        id = event.message.id;
+        if (event.message.usage?.input_tokens !== undefined) {
+          inputTokens = event.message.usage.input_tokens;
+        }
+        if (event.message.usage?.output_tokens !== undefined) {
+          outputTokens = event.message.usage.output_tokens;
+        }
+        continue;
+      }
+
+      if (event.type === 'content_block_start') {
+        const block = event.content_block;
         if (block.type === 'text') {
-          return { type: 'text', text: block.text };
-        }
-        if (block.type === 'thinking') {
-          return {
-            type: 'thinking',
-            text: block.thinking,
-            signature: block.signature,
-          };
-        }
-        if (block.type === 'redacted_thinking') {
-          return { type: 'thinking', text: '', redactedData: block.data };
-        }
-        if (block.type === 'tool_use') {
-          return {
-            type: 'tool-call',
+          blocks.set(event.index, { kind: 'text', text: block.text ?? '' });
+        } else if (block.type === 'thinking') {
+          blocks.set(event.index, {
+            kind: 'thinking',
+            text: block.thinking ?? '',
+          });
+        } else if (block.type === 'redacted_thinking') {
+          blocks.set(event.index, {
+            kind: 'redacted_thinking',
+            text: '',
+            redactedData: block.data,
+          });
+        } else if (block.type === 'tool_use') {
+          blocks.set(event.index, {
+            kind: 'tool_use',
+            text: '',
             toolCallId: block.id,
             toolName: block.name,
-            input: block.input,
+            argsBuffer: '',
+          });
+        }
+        continue;
+      }
+
+      if (event.type === 'content_block_delta') {
+        const builder = blocks.get(event.index);
+        if (!builder) continue;
+        const delta = event.delta;
+        if (delta.type === 'text_delta') {
+          builder.text += delta.text;
+          yield { type: 'text-delta', text: delta.text };
+        } else if (delta.type === 'thinking_delta') {
+          builder.text += delta.thinking;
+          yield { type: 'thinking-delta', text: delta.thinking };
+        } else if (delta.type === 'signature_delta') {
+          builder.signature = (builder.signature ?? '') + delta.signature;
+        } else if (delta.type === 'input_json_delta') {
+          builder.argsBuffer = (builder.argsBuffer ?? '') + delta.partial_json;
+        }
+        continue;
+      }
+
+      if (event.type === 'content_block_stop') {
+        const builder = blocks.get(event.index);
+        if (!builder) continue;
+        if (builder.kind === 'text') {
+          yield { type: 'text-end', text: builder.text };
+        } else if (builder.kind === 'thinking') {
+          yield {
+            type: 'thinking-end',
+            text: builder.text,
+            ...(builder.signature !== undefined
+              ? { signature: builder.signature }
+              : {}),
+          };
+        } else if (builder.kind === 'redacted_thinking') {
+          yield {
+            type: 'thinking-end',
+            text: '',
+            redactedData: builder.redactedData,
+          };
+        } else if (builder.kind === 'tool_use') {
+          const input = parseToolInput(builder.argsBuffer ?? '');
+          yield {
+            type: 'tool-call',
+            toolCallId: builder.toolCallId ?? '',
+            toolName: builder.toolName ?? '',
+            input,
           };
         }
-        throw new Error(
-          `Unexpected content block from Anthropic: ${(block as { type: string }).type}`,
-        );
-      });
+        blocks.delete(event.index);
+        continue;
+      }
 
-    return {
-      id: json.id,
-      content,
-      stopReason: json.stop_reason,
-      usage: {
-        inputTokens: json.usage.input_tokens,
-        outputTokens: json.usage.output_tokens,
-      },
+      if (event.type === 'message_delta') {
+        if (event.delta.stop_reason) stopReason = event.delta.stop_reason;
+        if (event.usage?.input_tokens !== undefined) {
+          inputTokens = event.usage.input_tokens;
+        }
+        if (event.usage?.output_tokens !== undefined) {
+          outputTokens = event.usage.output_tokens;
+        }
+        continue;
+      }
+
+      if (event.type === 'message_stop') {
+        sawMessageStop = true;
+        continue;
+      }
+
+      if (event.type === 'error') {
+        throw new Error(
+          event.error?.message ?? 'Anthropic stream returned an error.',
+        );
+      }
+    }
+
+    if (!sawMessageStop) {
+      throw new Error(
+        'Anthropic stream ended before message_stop; response is truncated.',
+      );
+    }
+
+    yield {
+      type: 'message-end',
+      id,
+      stopReason,
+      usage: { inputTokens, outputTokens },
     };
   }
 
@@ -311,6 +447,15 @@ class AnthropicModel extends Model {
       }
     }
     return hits;
+  }
+}
+
+function parseToolInput(raw: string): unknown {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
   }
 }
 

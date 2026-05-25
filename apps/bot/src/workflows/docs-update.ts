@@ -62,10 +62,9 @@ async function handleDocsUpdate(
   const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-docs-update-'));
   try {
-    const session = await agent.createSession({
-      prompt: buildPrompt(event, workspace, config),
-    });
-    logMessages(`docs-update:${tag}`, session.messages);
+    await using session = agent.session();
+    await session.send(buildPrompt(event, workspace, config));
+    logMessages(`docs-update:${tag}`, [...session.messages]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] docs-update failed for ${tag}: ${message}`);

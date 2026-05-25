@@ -3,15 +3,24 @@ import { z } from 'zod';
 import type { Trigger, TriggerHandler, Unsub } from '@/triggers/core';
 
 import type { McpClient } from './mcp';
-import type { TextPart, ToolCallPart, ToolResultPart } from './message';
+import type {
+  Message,
+  TextPart,
+  ThinkingPart,
+  ToolCallPart,
+  ToolResultPart,
+} from './message';
 import type { Model } from './model';
+import { Session, Turn, type SessionInternals, type TurnEmit } from './session';
 import { Skill } from './skill';
 import {
   Tool,
   createRegistry,
-  type Session,
+  type SearchHit,
   type SessionState,
+  type StopReason,
   type ToolContext,
+  type ToolRegistry,
 } from './tool';
 
 interface Registration<T = unknown> {
@@ -115,97 +124,279 @@ class Agent {
     });
   }
 
-  async createSession({ prompt }: { prompt: string }): Promise<Session> {
-    const mcpToolGroups = await Promise.all(
-      this.mcp.map((mcp) => mcp.connect()),
-    );
-    const allTools = [
-      ...this.tools,
-      ...mcpToolGroups.flat(),
-      ...(this.skills.length > 0 ? [this.buildSkillTool()] : []),
-    ];
+  // Build a fresh session, optionally seeded with a prior message history for
+  // resumption. MCP connections are lazy — no I/O until the first send().
+  session(init?: { messages?: Message[] }): Session {
+    const initialMessages = init?.messages
+      ? [...init.messages]
+      : ([] as Message[]);
+    const state: SessionState = {
+      messages: initialMessages,
+      store: new Map(),
+    };
+    let activeTurn: Turn | null = null;
+    let mcpConnected = false;
+    let allTools: Tool[] | null = null;
+    let registry: ToolRegistry | null = null;
+    let ctx: ToolContext | null = null;
+
+    const ensureReady = async (): Promise<{
+      tools: Tool[];
+      registry: ToolRegistry;
+      ctx: ToolContext;
+    }> => {
+      if (!allTools || !registry || !ctx) {
+        const mcpToolGroups = await Promise.all(
+          this.mcp.map((mcp) => mcp.connect()),
+        );
+        mcpConnected = true;
+        allTools = [
+          ...this.tools,
+          ...mcpToolGroups.flat(),
+          ...(this.skills.length > 0 ? [this.buildSkillTool()] : []),
+        ];
+        registry = createRegistry(allTools);
+        ctx = {
+          complete: async (p: string): Promise<string> => {
+            const response = await this.model.createMessage({
+              messages: [{ role: 'user', content: p }],
+            });
+            return response.content
+              .filter((block): block is TextPart => block.type === 'text')
+              .map((block) => block.text)
+              .join('\n');
+          },
+          searchWeb: (query, opts): Promise<SearchHit[]> =>
+            this.model.searchWeb(query, opts),
+          session: state,
+          tools: registry,
+        };
+        // Seed the message log with the system prompt once we know the tool set.
+        if (
+          state.messages.length === 0 ||
+          state.messages[0]?.role !== 'system'
+        ) {
+          state.messages.unshift({
+            role: 'system',
+            content: this.buildSystem(allTools),
+          });
+        }
+      }
+      return { tools: allTools, registry, ctx };
+    };
+
+    const internals: SessionInternals = {
+      send: (prompt) => {
+        if (activeTurn !== null) {
+          throw new Error(
+            'Session.send() called while another turn is in flight.',
+          );
+        }
+        const turn = new Turn(async (turnCtx) => {
+          try {
+            const ready = await ensureReady();
+            state.messages.push(toUserMessage(prompt));
+            await runAgentLoop({
+              model: this.model,
+              state,
+              registry: ready.registry,
+              ctx: ready.ctx,
+              emit: turnCtx.emit,
+              signal: turnCtx.signal,
+            });
+            return [...state.messages];
+          } finally {
+            activeTurn = null;
+          }
+        });
+        activeTurn = turn;
+        return turn;
+      },
+      close: async (): Promise<void> => {
+        const pending = activeTurn;
+        if (pending) {
+          pending.abort('session closed');
+          // Wait for the in-flight loop to observe the abort and unwind
+          // (including any tool call mid-flight) before tearing down MCP.
+          await Promise.resolve(pending).catch(() => {});
+        }
+        if (mcpConnected) {
+          await Promise.all(this.mcp.map((mcp) => mcp.disconnect()));
+          mcpConnected = false;
+        }
+      },
+    };
+
+    return new Session(internals, state);
+  }
+}
+
+function toUserMessage(prompt: string | TextPart[]): Message {
+  if (typeof prompt === 'string') return { role: 'user', content: prompt };
+  return { role: 'user', content: prompt };
+}
+
+interface AgentLoopArgs {
+  model: Model;
+  state: SessionState;
+  registry: ToolRegistry;
+  ctx: ToolContext;
+  emit: TurnEmit;
+  signal: AbortSignal;
+}
+
+async function runAgentLoop({
+  model,
+  state,
+  registry,
+  ctx,
+  emit,
+  signal,
+}: AgentLoopArgs): Promise<void> {
+  while (true) {
+    if (signal.aborted) break;
+
+    const active = registry.loaded();
+    const toolByName = new Map(active.map((tool) => [tool.name, tool]));
+
+    emit({ type: 'message-start' });
+
+    const assistantContent: (TextPart | ThinkingPart | ToolCallPart)[] = [];
+    let stopReason: StopReason = 'end_turn';
+    let usage = { inputTokens: 0, outputTokens: 0 };
 
     try {
-      const state: SessionState = {
-        messages: [
-          { role: 'system', content: this.buildSystem(allTools) },
-          { role: 'user', content: prompt },
-        ],
-        store: new Map(),
-      };
-
-      const registry = createRegistry(allTools);
-
-      const ctx: ToolContext = {
-        complete: async (p: string): Promise<string> => {
-          const response = await this.model.createMessage({
-            messages: [{ role: 'user', content: p }],
-          });
-          return response.content
-            .filter((block): block is TextPart => block.type === 'text')
-            .map((block) => block.text)
-            .join('\n');
-        },
-        searchWeb: (query, opts) => this.model.searchWeb(query, opts),
-        session: state,
-        tools: registry,
-      };
-
-      while (true) {
-        const active = registry.loaded();
-        const toolByName = new Map(active.map((tool) => [tool.name, tool]));
-
-        const response = await this.model.createMessage({
-          messages: state.messages,
-          tools: active,
-        });
-
-        state.messages.push({ role: 'assistant', content: response.content });
-
-        if (response.stopReason !== 'tool_use') break;
-
-        const toolCalls = response.content.filter(
-          (block): block is ToolCallPart => block.type === 'tool-call',
-        );
-
-        const results: ToolResultPart[] = [];
-        for (const call of toolCalls) {
-          const tool = toolByName.get(call.toolName);
-          if (!tool) {
-            results.push({
-              type: 'tool-result',
-              toolCallId: call.toolCallId,
-              toolName: call.toolName,
-              output: `Error: tool "${call.toolName}" not found`,
+      for await (const event of model.streamMessage({
+        messages: state.messages,
+        tools: active,
+        signal,
+      })) {
+        switch (event.type) {
+          case 'text-delta':
+            emit({ type: 'text-delta', text: event.text });
+            break;
+          case 'text-end':
+            assistantContent.push({ type: 'text', text: event.text });
+            emit({ type: 'text', text: event.text });
+            break;
+          case 'thinking-delta':
+            emit({ type: 'thinking-delta', text: event.text });
+            break;
+          case 'thinking-end':
+            assistantContent.push({
+              type: 'thinking',
+              text: event.text,
+              ...(event.signature !== undefined
+                ? { signature: event.signature }
+                : {}),
+              ...(event.redactedData !== undefined
+                ? { redactedData: event.redactedData }
+                : {}),
             });
-            continue;
-          }
-          try {
-            const parsed = tool.parse(call.input);
-            const output = await tool.execute(parsed, ctx);
-            results.push({
-              type: 'tool-result',
-              toolCallId: call.toolCallId,
-              toolName: call.toolName,
-              output,
+            emit({
+              type: 'thinking',
+              text: event.text,
+              ...(event.signature !== undefined
+                ? { signature: event.signature }
+                : {}),
             });
-          } catch (error) {
-            results.push({
-              type: 'tool-result',
-              toolCallId: call.toolCallId,
-              toolName: call.toolName,
-              output: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            break;
+          case 'tool-call':
+            assistantContent.push({
+              type: 'tool-call',
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              input: event.input,
             });
-          }
+            emit({
+              type: 'tool-call',
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              input: event.input,
+            });
+            break;
+          case 'message-end':
+            stopReason = event.stopReason;
+            usage = event.usage;
+            break;
+          default:
+            break;
         }
-
-        state.messages.push({ role: 'tool', content: results });
       }
-
-      return { messages: state.messages };
-    } finally {
-      await Promise.all(this.mcp.map((mcp) => mcp.disconnect()));
+    } catch (error) {
+      if (signal.aborted) {
+        state.messages.push({ role: 'assistant', content: assistantContent });
+        break;
+      }
+      const err = error instanceof Error ? error : new Error(String(error));
+      emit({ type: 'error', error: err });
+      throw err;
     }
+
+    state.messages.push({ role: 'assistant', content: assistantContent });
+    emit({ type: 'message-end', usage });
+
+    if (stopReason !== 'tool_use') {
+      emit({ type: 'turn-end' });
+      break;
+    }
+
+    const toolCalls = assistantContent.filter(
+      (block): block is ToolCallPart => block.type === 'tool-call',
+    );
+    const results: ToolResultPart[] = [];
+    for (const call of toolCalls) {
+      if (signal.aborted) break;
+      const tool = toolByName.get(call.toolName);
+      const result = await runTool(tool, call, ctx);
+      results.push(result);
+      emit({
+        type: 'tool-result',
+        toolCallId: result.toolCallId,
+        toolName: result.toolName,
+        output: result.output,
+        isError:
+          typeof result.output === 'string'
+            ? result.output.startsWith('Error:')
+            : false,
+      });
+    }
+
+    state.messages.push({ role: 'tool', content: results });
+
+    if (signal.aborted) break;
+  }
+}
+
+async function runTool(
+  tool: Tool | undefined,
+  call: ToolCallPart,
+  ctx: ToolContext,
+): Promise<ToolResultPart> {
+  if (!tool) {
+    return {
+      type: 'tool-result',
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      output: `Error: tool "${call.toolName}" not found`,
+    };
+  }
+  try {
+    const parsed = tool.parse(call.input);
+    const output = await tool.execute(parsed, ctx);
+    return {
+      type: 'tool-result',
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      output,
+    };
+  } catch (error) {
+    return {
+      type: 'tool-result',
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      output: `Error: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 

@@ -3,7 +3,7 @@ import { codex } from '@/harness';
 import { OpenAIModel } from '@/models';
 import { prReview } from '@/skills';
 
-import { logMessages } from './common';
+import { logEvents, logMessages } from './common';
 
 const agent = new Agent({
   model: new OpenAIModel('gpt-5.5', { thinking: 'high' }),
@@ -12,8 +12,7 @@ const agent = new Agent({
   skills: [prReview],
 });
 
-const session = await agent.createSession({
-  prompt: 'Review the current branch.',
-});
+await using session = agent.session();
 
-logMessages(session.messages);
+await logEvents(session.send('Review the current branch.'));
+logMessages([...session.messages]);
