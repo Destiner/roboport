@@ -9,10 +9,7 @@ interface Trigger<T = unknown> {
   start(emit: Emit<T>): MaybePromise<Unsub>;
 }
 
-interface Subscription<T = unknown> {
-  prompt: string | ((event: T) => MaybePromise<string>);
-  thread?: (event: T) => string | undefined;
-}
+type TriggerHandler<T> = (event: T) => MaybePromise<void>;
 
 interface CustomTriggerInit<T> {
   name: string;
@@ -23,4 +20,4 @@ function trigger<T = unknown>(init: CustomTriggerInit<T>): Trigger<T> {
   return { name: init.name, start: init.start };
 }
 
-export { trigger, type Emit, type Subscription, type Trigger, type Unsub };
+export { trigger, type Emit, type Trigger, type TriggerHandler, type Unsub };

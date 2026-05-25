@@ -1,4 +1,10 @@
-import { trigger, type Emit, type Trigger, type Unsub } from './core';
+import {
+  trigger,
+  type Emit,
+  type Trigger,
+  type TriggerHandler,
+  type Unsub,
+} from './core';
 import { cron, type CronEvent } from './sources/cron';
 import {
   githubTrigger,
@@ -41,5 +47,6 @@ export {
   type PullRequestEvent,
   type PushEvent,
   type Trigger,
+  type TriggerHandler,
   type Unsub,
 };
