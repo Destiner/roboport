@@ -17,10 +17,6 @@ interface SessionState {
   store: Map<string, unknown>;
 }
 
-interface Session {
-  messages: Message[];
-}
-
 interface ToolRegistry {
   loaded(): Tool[];
   deferred(): Tool[];
@@ -43,6 +39,7 @@ interface CreateMessageParams {
   messages: Message[];
   tools?: Tool[];
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 interface CreateMessageResponse {
@@ -155,7 +152,6 @@ export {
   type CreateMessageResponse,
   type SearchHit,
   type SearchOptions,
-  type Session,
   type SessionState,
   type StopReason,
   type ToolContext,

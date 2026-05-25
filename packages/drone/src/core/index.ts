@@ -8,14 +8,15 @@ import type {
   ToolResultPart,
 } from './message';
 import { Model, type LiteralUnion, type ThinkingLevel } from './model';
+import { Session, Turn, type TurnEvent } from './session';
 import { Skill } from './skill';
+import type { ModelStreamEvent } from './stream';
 import {
   Tool,
   type CreateMessageParams,
   type CreateMessageResponse,
   type SearchHit,
   type SearchOptions,
-  type Session,
   type SessionState,
   type StopReason,
   type ToolContext,
@@ -25,16 +26,18 @@ import {
 export {
   Agent,
   Model,
+  Session,
   Skill,
   Tool,
+  Turn,
   type CreateMessageParams,
   type CreateMessageResponse,
   type LiteralUnion,
   type McpClient,
   type Message,
+  type ModelStreamEvent,
   type SearchHit,
   type SearchOptions,
-  type Session,
   type SessionState,
   type StopReason,
   type TextPart,
@@ -44,4 +47,5 @@ export {
   type ToolContext,
   type ToolRegistry,
   type ToolResultPart,
+  type TurnEvent,
 };

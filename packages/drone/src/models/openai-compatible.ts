@@ -1,13 +1,12 @@
 import {
   Model,
   type CreateMessageParams,
-  type CreateMessageResponse,
   type Message,
+  type ModelStreamEvent,
   type StopReason,
-  type TextPart,
   type ThinkingLevel,
-  type ToolCallPart,
 } from '@/core';
+import { readSse } from '@/core/stream';
 
 interface OpenAIToolCall {
   id: string;
@@ -27,13 +26,43 @@ type OpenAIWireMessage =
   | OpenAIAssistantWireMessage
   | { role: 'tool'; tool_call_id: string; content: string };
 
+interface ChatCompletionsToolCallDelta {
+  index: number;
+  id?: string;
+  type?: 'function';
+  function?: { name?: string; arguments?: string };
+}
+
+interface ChatCompletionsStreamChunk {
+  id?: string;
+  choices?: {
+    delta?: {
+      role?: string;
+      content?: string | null;
+      reasoning_content?: string | null;
+      tool_calls?: ChatCompletionsToolCallDelta[];
+    };
+    finish_reason?: string | null;
+  }[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+}
+
+interface ToolCallBuilder {
+  id: string;
+  name: string;
+  argsBuffer: string;
+}
+
 function serializeToolOutput(output: unknown): string {
   if (output === undefined || output === null) return '';
   if (typeof output === 'string') return output;
   return JSON.stringify(output);
 }
 
-function mapFinishReason(reason: string): StopReason {
+function mapFinishReason(reason: string | null | undefined): StopReason {
   switch (reason) {
     case 'stop':
       return 'end_turn';
@@ -74,10 +103,10 @@ abstract class OpenAICompatibleModel extends Model {
     this.thinking = options.thinking ?? 'off';
   }
 
-  override async createMessage(
+  override async *streamMessage(
     params: CreateMessageParams,
-  ): Promise<CreateMessageResponse> {
-    const { messages, tools, maxTokens = 8192 } = params;
+  ): AsyncIterable<ModelStreamEvent> {
+    const { messages, tools, maxTokens = 8192, signal } = params;
     const wireMessages = this.serializeMessages(messages);
 
     const wireTools = tools?.map((tool) => ({
@@ -93,6 +122,8 @@ abstract class OpenAICompatibleModel extends Model {
       model: this.modelName,
       messages: wireMessages,
       max_completion_tokens: maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
     };
     if (wireTools !== undefined && wireTools.length > 0) body.tools = wireTools;
     this.applyThinking(body);
@@ -102,8 +133,10 @@ abstract class OpenAICompatibleModel extends Model {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${this.apiKey}`,
+        accept: 'text/event-stream',
       },
       body: JSON.stringify(body),
+      signal,
     });
 
     if (!response.ok) {
@@ -112,44 +145,103 @@ abstract class OpenAICompatibleModel extends Model {
       );
     }
 
-    const json = (await response.json()) as {
-      id: string;
-      choices: {
-        finish_reason: string;
-        message: {
-          content: string | null;
-          tool_calls?: OpenAIToolCall[];
-        };
-      }[];
-      usage: { prompt_tokens: number; completion_tokens: number };
-    };
+    let id = '';
+    let stopReason: StopReason = 'end_turn';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let textOpen = false;
+    let textBuffer = '';
+    let thinkingOpen = false;
+    let thinkingBuffer = '';
+    const toolBuilders = new Map<number, ToolCallBuilder>();
+    const toolOrder: number[] = [];
 
-    const choice = json.choices[0];
-    if (!choice) throw new Error('Provider returned no choices');
+    for await (const raw of readSse(response)) {
+      const chunk = raw as ChatCompletionsStreamChunk;
+      if (chunk.id && !id) id = chunk.id;
+      if (chunk.usage) {
+        if (chunk.usage.prompt_tokens !== undefined) {
+          inputTokens = chunk.usage.prompt_tokens;
+        }
+        if (chunk.usage.completion_tokens !== undefined) {
+          outputTokens = chunk.usage.completion_tokens;
+        }
+      }
 
-    const content: (TextPart | ToolCallPart)[] = [];
-    if (choice.message.content) {
-      content.push({ type: 'text', text: choice.message.content });
-    }
-    if (choice.message.tool_calls) {
-      for (const call of choice.message.tool_calls) {
-        content.push({
-          type: 'tool-call',
-          toolCallId: call.id,
-          toolName: call.function.name,
-          input: parseToolArguments(call.function.arguments),
-        });
+      const choice = chunk.choices?.[0];
+      if (!choice) continue;
+
+      const delta = choice.delta;
+      if (delta) {
+        const reasoning = delta.reasoning_content;
+        if (typeof reasoning === 'string' && reasoning.length > 0) {
+          if (!thinkingOpen) thinkingOpen = true;
+          thinkingBuffer += reasoning;
+          yield { type: 'thinking-delta', text: reasoning };
+        }
+
+        const content = delta.content;
+        if (typeof content === 'string' && content.length > 0) {
+          if (thinkingOpen) {
+            yield { type: 'thinking-end', text: thinkingBuffer };
+            thinkingOpen = false;
+            thinkingBuffer = '';
+          }
+          if (!textOpen) textOpen = true;
+          textBuffer += content;
+          yield { type: 'text-delta', text: content };
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index;
+            let builder = toolBuilders.get(idx);
+            if (!builder) {
+              builder = {
+                id: tc.id ?? '',
+                name: tc.function?.name ?? '',
+                argsBuffer: '',
+              };
+              toolBuilders.set(idx, builder);
+              toolOrder.push(idx);
+            }
+            if (tc.id) builder.id = tc.id;
+            if (tc.function?.name) builder.name = tc.function.name;
+            if (tc.function?.arguments) {
+              builder.argsBuffer += tc.function.arguments;
+            }
+          }
+        }
+      }
+
+      if (choice.finish_reason) {
+        stopReason = mapFinishReason(choice.finish_reason);
       }
     }
 
-    return {
-      id: json.id,
-      content,
-      stopReason: mapFinishReason(choice.finish_reason),
-      usage: {
-        inputTokens: json.usage.prompt_tokens,
-        outputTokens: json.usage.completion_tokens,
-      },
+    if (textOpen) {
+      yield { type: 'text-end', text: textBuffer };
+    }
+    if (thinkingOpen) {
+      yield { type: 'thinking-end', text: thinkingBuffer };
+    }
+
+    for (const idx of toolOrder) {
+      const builder = toolBuilders.get(idx);
+      if (!builder) continue;
+      yield {
+        type: 'tool-call',
+        toolCallId: builder.id,
+        toolName: builder.name,
+        input: parseToolArguments(builder.argsBuffer),
+      };
+    }
+
+    yield {
+      type: 'message-end',
+      id,
+      stopReason,
+      usage: { inputTokens, outputTokens },
     };
   }
 

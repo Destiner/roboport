@@ -50,10 +50,9 @@ async function handlePrReview(
   const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-pr-review-'));
   try {
-    const session = await agent.createSession({
-      prompt: buildPrompt(event, workspace),
-    });
-    logMessages(`pr-review:${tag}`, session.messages);
+    await using session = agent.session();
+    await session.send(buildPrompt(event, workspace));
+    logMessages(`pr-review:${tag}`, [...session.messages]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] pr-review failed for ${tag}: ${message}`);

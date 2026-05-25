@@ -1,16 +1,15 @@
 import type {
   CreateMessageParams,
-  CreateMessageResponse,
   LiteralUnion,
   Message,
+  ModelStreamEvent,
   SearchHit,
   SearchOptions,
   StopReason,
-  TextPart,
   ThinkingLevel,
   Tool,
-  ToolCallPart,
 } from '@/core';
+import { readSse } from '@/core/stream';
 import { env } from '@/env';
 
 import { OpenAICodexAuth } from './openai-codex-auth';
@@ -87,9 +86,46 @@ type ResponsesJson = {
 };
 
 type ResponsesStreamEvent =
+  | { type: 'response.created'; response: { id?: string } }
   | { type: 'response.completed'; response: ResponsesJson }
   | { type: 'response.failed'; response?: { error?: { message?: string } } }
-  | { type: 'response.output_item.done'; item: ResponsesOutputItem };
+  | {
+      type: 'response.output_item.added';
+      item:
+        | {
+            type: 'message';
+            id?: string;
+          }
+        | {
+            type: 'function_call';
+            id?: string;
+            call_id?: string;
+            name?: string;
+          }
+        | { type: 'reasoning'; id?: string };
+      output_index?: number;
+    }
+  | { type: 'response.output_item.done'; item: ResponsesOutputItem }
+  | { type: 'response.output_text.delta'; delta: string; output_index?: number }
+  | { type: 'response.output_text.done'; text: string; output_index?: number }
+  | {
+      type: 'response.function_call_arguments.delta';
+      delta: string;
+      item_id?: string;
+    }
+  | {
+      type: 'response.function_call_arguments.done';
+      arguments: string;
+      item_id?: string;
+    }
+  | {
+      type: 'response.reasoning_summary_text.delta';
+      delta: string;
+    }
+  | {
+      type: 'response.reasoning_summary_text.done';
+      text: string;
+    };
 
 function serializeToolOutput(output: unknown): string {
   if (output === undefined || output === null) return '';
@@ -227,13 +263,14 @@ class OpenAIModel extends OpenAICompatibleModel {
     }
   }
 
-  override async createMessage(
+  override async *streamMessage(
     params: CreateMessageParams,
-  ): Promise<CreateMessageResponse> {
+  ): AsyncIterable<ModelStreamEvent> {
     if (this.codexAuth || isResponsesOnlyModel(this.modelName)) {
-      return this.createResponsesMessage(params);
+      yield* this.streamResponses(params);
+      return;
     }
-    return super.createMessage(params);
+    yield* super.streamMessage(params);
   }
 
   protected override applyThinking(body: Record<string, unknown>): void {
@@ -249,7 +286,7 @@ class OpenAIModel extends OpenAICompatibleModel {
     opts?: SearchOptions,
   ): Promise<SearchHit[]> {
     if (this.codexAuth) {
-      const json = await this.fetchResponses({
+      const json = await this.fetchResponsesBuffered({
         model: this.modelName,
         stream: true,
         tools: [{ type: 'web_search_preview' }],
@@ -317,14 +354,14 @@ class OpenAIModel extends OpenAICompatibleModel {
     return hits;
   }
 
-  private async createResponsesMessage(
+  private async *streamResponses(
     params: CreateMessageParams,
-  ): Promise<CreateMessageResponse> {
+  ): AsyncIterable<ModelStreamEvent> {
     if (this.codexAuth && params.maxTokens !== undefined) {
       throw new Error('OpenAI Codex auth does not support maxTokens.');
     }
 
-    const { messages, tools, maxTokens } = params;
+    const { messages, tools, maxTokens, signal } = params;
     const { instructions, input } = responsesMessageInput(messages);
     const wireTools = responsesTools(tools);
     const body: Record<string, unknown> = {
@@ -342,11 +379,145 @@ class OpenAIModel extends OpenAICompatibleModel {
       body.reasoning = { effort: this.thinking };
     }
 
-    const json = await this.fetchResponses(body);
-    return parseCodexResponse(json);
+    const { url, headers } = await this.responsesEndpoint();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { ...headers, accept: 'text/event-stream' },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `OpenAI Responses error ${response.status}: ${await response.text()}`,
+      );
+    }
+
+    let id = '';
+    let stopReason: StopReason = 'end_turn';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let sawToolCall = false;
+    let textOpen = false;
+    let thinkingOpen = false;
+
+    const toolByItemId = new Map<
+      string,
+      { callId: string; name: string; argsBuffer: string }
+    >();
+    const itemOrder: string[] = [];
+
+    for await (const raw of readSse(response)) {
+      const event = raw as ResponsesStreamEvent;
+
+      if (event.type === 'response.created') {
+        if (event.response.id) id = event.response.id;
+        continue;
+      }
+
+      if (event.type === 'response.output_item.added') {
+        const item = event.item;
+        if (item.type === 'function_call' && item.id) {
+          toolByItemId.set(item.id, {
+            callId: item.call_id ?? item.id,
+            name: item.name ?? '',
+            argsBuffer: '',
+          });
+          itemOrder.push(item.id);
+        }
+        continue;
+      }
+
+      if (event.type === 'response.output_text.delta') {
+        if (!textOpen) textOpen = true;
+        yield { type: 'text-delta', text: event.delta };
+        continue;
+      }
+
+      if (event.type === 'response.output_text.done') {
+        if (textOpen) {
+          yield { type: 'text-end', text: event.text };
+          textOpen = false;
+        }
+        continue;
+      }
+
+      if (event.type === 'response.reasoning_summary_text.delta') {
+        if (!thinkingOpen) thinkingOpen = true;
+        yield { type: 'thinking-delta', text: event.delta };
+        continue;
+      }
+
+      if (event.type === 'response.reasoning_summary_text.done') {
+        if (thinkingOpen) {
+          yield { type: 'thinking-end', text: event.text };
+          thinkingOpen = false;
+        }
+        continue;
+      }
+
+      if (event.type === 'response.function_call_arguments.delta') {
+        if (event.item_id) {
+          const builder = toolByItemId.get(event.item_id);
+          if (builder) builder.argsBuffer += event.delta;
+        }
+        continue;
+      }
+
+      if (event.type === 'response.function_call_arguments.done') {
+        if (event.item_id) {
+          const builder = toolByItemId.get(event.item_id);
+          if (builder) builder.argsBuffer = event.arguments;
+        }
+        continue;
+      }
+
+      if (event.type === 'response.output_item.done') {
+        const item = event.item;
+        if (item.type === 'function_call') {
+          sawToolCall = true;
+          // Prefer the stream-accumulated args; fall back to the item's value.
+          const callId = item.call_id ?? '';
+          const matched = [...toolByItemId.values()].find(
+            (b) => b.callId === callId,
+          );
+          const args = matched?.argsBuffer ?? item.arguments ?? '';
+          yield {
+            type: 'tool-call',
+            toolCallId: callId,
+            toolName: item.name,
+            input: parseToolArguments(args),
+          };
+        }
+        continue;
+      }
+
+      if (event.type === 'response.completed') {
+        if (!id && event.response.id) id = event.response.id;
+        stopReason = sawToolCall
+          ? 'tool_use'
+          : mapResponsesStatus(event.response.status);
+        inputTokens = event.response.usage?.input_tokens ?? inputTokens;
+        outputTokens = event.response.usage?.output_tokens ?? outputTokens;
+        continue;
+      }
+
+      if (event.type === 'response.failed') {
+        throw new Error(
+          event.response?.error?.message ?? 'OpenAI Responses stream failed.',
+        );
+      }
+    }
+
+    yield {
+      type: 'message-end',
+      id,
+      stopReason,
+      usage: { inputTokens, outputTokens },
+    };
   }
 
-  private async fetchResponses(
+  private async fetchResponsesBuffered(
     body: Record<string, unknown>,
   ): Promise<ResponsesJson> {
     const { url, headers } = await this.responsesEndpoint();
@@ -456,42 +627,6 @@ function parseSseEvents(raw: string): ResponsesStreamEvent[] {
   }
 
   return events;
-}
-
-function parseCodexResponse(json: ResponsesJson): CreateMessageResponse {
-  const content: (TextPart | ToolCallPart)[] = [];
-
-  for (const item of json.output ?? []) {
-    if (item.type === 'message') {
-      for (const part of item.content ?? []) {
-        if (part.type === 'output_text' && part.text) {
-          content.push({ type: 'text', text: part.text });
-        }
-      }
-      continue;
-    }
-
-    if (item.type === 'function_call') {
-      content.push({
-        type: 'tool-call',
-        toolCallId: item.call_id ?? item.id ?? `call_${content.length}`,
-        toolName: item.name,
-        input: parseToolArguments(item.arguments),
-      });
-    }
-  }
-
-  return {
-    id: json.id,
-    content,
-    stopReason: content.some((part) => part.type === 'tool-call')
-      ? 'tool_use'
-      : mapResponsesStatus(json.status),
-    usage: {
-      inputTokens: json.usage?.input_tokens ?? 0,
-      outputTokens: json.usage?.output_tokens ?? 0,
-    },
-  };
 }
 
 function extractSearchHits(json: ResponsesJson): SearchHit[] {
