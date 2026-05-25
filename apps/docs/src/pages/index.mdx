@@ -35,9 +35,10 @@ const agent = new Agent({
 
 const grafana = grafanaTrigger();
 agent.on(grafana.alert({ status: 'firing' }), async (alert) => {
-  await agent.createSession({
-    prompt: `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
-  });
+  await using session = agent.session();
+  await session.send(
+    `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
+  );
 });
 
 await agent.start();
@@ -53,6 +54,35 @@ bun install
 bun run check
 bun run typecheck
 ```
+
+## Sessions
+
+`agent.session()` returns a `Session` you can stream from and reuse across turns.
+
+```ts
+await using session = agent.session();
+
+// Stream events as they arrive
+for await (const event of session.send('Summarise the branch.')) {
+  if (event.type === 'text-delta') process.stdout.write(event.text);
+  if (event.type === 'tool-call') console.log(`→ ${event.toolName}`);
+  if (event.type === 'tool-result') console.log(`← ${event.toolName}`);
+}
+
+// Or await the turn for the post-turn message history
+const messages = await session.send('Now write a PR description.');
+```
+
+Event types include `text-delta`, `text`, `thinking-delta`, `thinking`, `tool-call`, `tool-result`, `message-start`, `message-end`, `turn-end`, and `error`. Token-level deltas stream as the model emits them; matching completion events fire once each block is fully assembled.
+
+Resume a prior conversation by passing its message history:
+
+```ts
+const resumed = agent.session({ messages: savedMessages });
+await resumed.send('Continue from here.');
+```
+
+Sessions hold MCP connections for their lifetime, so close them when done (or use `await using`).
 
 ## Status
 

@@ -3,7 +3,7 @@ import { claudeCode } from '@/harness';
 import { AnthropicModel } from '@/models';
 import { codeSimplifier } from '@/skills';
 
-import { logMessages } from './common';
+import { logEvents, logMessages } from './common';
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-7'),
@@ -12,8 +12,7 @@ const agent = new Agent({
   skills: [codeSimplifier],
 });
 
-const session = await agent.createSession({
-  prompt: 'Summarise the changes on the current branch.',
-});
+await using session = agent.session();
 
-logMessages(session.messages);
+await logEvents(session.send('Summarise the changes on the current branch.'));
+logMessages([...session.messages]);

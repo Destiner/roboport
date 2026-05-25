@@ -1,4 +1,4 @@
-import type { Message } from '@/core';
+import type { Message, TurnEvent } from '@/core';
 
 function logMessages(messages: Message[]): void {
   for (const message of messages) {
@@ -38,5 +38,30 @@ function logMessages(messages: Message[]): void {
   }
 }
 
-// eslint-disable-next-line import-x/prefer-default-export
-export { logMessages };
+async function logEvents(stream: AsyncIterable<TurnEvent>): Promise<void> {
+  for await (const event of stream) {
+    switch (event.type) {
+      case 'text-delta':
+        process.stdout.write(event.text);
+        break;
+      case 'text':
+        process.stdout.write('\n');
+        break;
+      case 'tool-call':
+        console.log(
+          `\n[tool-call] ${event.toolName}(${JSON.stringify(event.input)})`,
+        );
+        break;
+      case 'tool-result':
+        console.log(
+          `[tool-result] ${event.toolName} -> ${JSON.stringify(event.output)}`,
+        );
+        break;
+      case 'error':
+        console.error(`[error] ${event.error.message}`);
+        break;
+    }
+  }
+}
+
+export { logEvents, logMessages };
