@@ -14,6 +14,11 @@ import type {
 import type { Config } from '../config';
 import { logMessages } from '../log';
 
+// Appended to every simplification idea comment so review-comment replies can be
+// routed back to this workflow. pr-review also posts bot-authored inline
+// comments, so the reply gate matches on this marker, not just authorship.
+const SIMPLIFY_IDEA_MARKER = '<!-- drone-simplify-idea -->';
+
 function createSimplifyAgent(config: Config): Agent {
   return new Agent({
     model: new OpenAIModel('gpt-5.5', {
@@ -42,7 +47,8 @@ You are suggesting simplifications for PR #${number} in ${repo}, in SUGGEST-ONLY
 3. Post each idea as a SINGLE inline review comment, anchored to path + line on head commit ${headSha}:
    - gh api repos/${repo}/pulls/${number}/comments -f body=... -f commit_id=${headSha} -f path=... -F line=...
    - One comment per idea. Describe the simplification and why (cite the rule or local convention). Prose only — do NOT use \`\`\`suggestion blocks.
-   - End each comment with one line inviting the author to reply in the thread to have you apply it, adjustments welcome.
+   - Second-to-last line: invite the author to reply in the thread to have you apply it, adjustments welcome.
+   - Last line: this marker verbatim, unchanged, on its own line: ${SIMPLIFY_IDEA_MARKER}
 4. Do NOT post a summary review. If there are no worthwhile, behaviour-preserving simplifications, print "no simplifications" and post nothing.
 
 Stay diff-scoped and conservative: skip anything a correctness/security reviewer would already flag, and skip pure style a linter handles. The GH_TOKEN env var is set and gh is authenticated.`;
@@ -82,7 +88,7 @@ ${event.comment.body}
    - Run \`bun install\`, then \`bun run check\` and \`bun run typecheck\`. If they fail and you cannot fix them within the change's scope, stop without committing.
    - Stage only the files you changed. Commit with a \`refactor:\` message describing the simplification. Do NOT add [skip ci].
    - Push to origin/${headRef}.
-   - Reply in the thread (gh api repos/${repo}/pulls/${number}/comments -f in_reply_to=${replyId} -f body=...) linking the commit you pushed.
+   - Reply in the thread (gh api repos/${repo}/pulls/${number}/comments -f in_reply_to=${rootId} -f body=...) linking the commit you pushed. Thread replies anchor to the root comment ${rootId}, not the triggering reply.
 
 Do not amend or force-push. Do not touch unrelated code. The GH_TOKEN env var is set and gh is authenticated; git push works via gh's credential helper.`;
 }
@@ -124,4 +130,9 @@ async function handleSimplifyReply(
   }
 }
 
-export { createSimplifyAgent, handleSimplifyIdeas, handleSimplifyReply };
+export {
+  createSimplifyAgent,
+  handleSimplifyIdeas,
+  handleSimplifyReply,
+  SIMPLIFY_IDEA_MARKER,
+};

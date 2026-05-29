@@ -16,6 +16,7 @@ import {
   createSimplifyAgent,
   handleSimplifyIdeas,
   handleSimplifyReply,
+  SIMPLIFY_IDEA_MARKER,
 } from './workflows/simplify';
 
 const config = loadConfig();
@@ -97,18 +98,12 @@ async function isEventActionable(event: PullRequestEvent): Promise<boolean> {
   return true;
 }
 
-async function reviewCommentAuthor(
+async function reviewComment(
   repo: string,
   commentId: number,
-): Promise<string | null> {
+): Promise<{ author: string; body: string } | null> {
   const proc = Bun.spawn(
-    [
-      'gh',
-      'api',
-      `repos/${repo}/pulls/comments/${commentId}`,
-      '--jq',
-      '.user.login',
-    ],
+    ['gh', 'api', `repos/${repo}/pulls/comments/${commentId}`],
     { stdout: 'pipe', stderr: 'pipe' },
   );
   const exitCode = await proc.exited;
@@ -119,11 +114,20 @@ async function reviewCommentAuthor(
     );
     return null;
   }
-  return (await new Response(proc.stdout).text()).trim();
+  try {
+    const data = (await new Response(proc.stdout).json()) as {
+      user?: { login?: string };
+      body?: string;
+    };
+    return { author: data.user?.login ?? '', body: data.body ?? '' };
+  } catch {
+    return null;
+  }
 }
 
-// Act only on replies authored by an allowed actor under one of the bot's own
-// inline simplification threads.
+// Act only on replies by an allowed actor under one of the bot's own inline
+// simplification ideas. pr-review also posts bot-authored inline comments, so
+// authorship alone is not enough — the root must carry the simplify marker.
 async function isReplyActionable(
   event: PullRequestReviewCommentEvent,
 ): Promise<boolean> {
@@ -135,11 +139,9 @@ async function isReplyActionable(
   }
   const rootId = event.comment.in_reply_to_id;
   if (rootId === undefined) return false;
-  const rootAuthor = await reviewCommentAuthor(
-    event.repository.full_name,
-    rootId,
-  );
-  return rootAuthor === botLogin;
+  const root = await reviewComment(event.repository.full_name, rootId);
+  if (root === null) return false;
+  return root.author === botLogin && root.body.includes(SIMPLIFY_IDEA_MARKER);
 }
 
 const prTrigger = ghReceiver.pullRequest({
