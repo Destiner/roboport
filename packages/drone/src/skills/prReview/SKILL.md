@@ -82,4 +82,4 @@ No praise section. No confidence scores. Include a committable suggestion only w
 
 ## Posting (remote PRs only)
 
-If the user asks to post findings: use `gh pr review --comment`/`--request-changes` for the verdict, and `gh api` for inline comments anchored to `path` + `line`. Never auto-post.
+If the user asks to post findings: submit the verdict with `gh pr review`, choosing the action that matches it — `Approve` → `--approve`, `Request changes` → `--request-changes`, `Approve with must-fixes` → `--comment` (advisory) or `--request-changes` (gating), caller's choice — and `gh api` for inline comments anchored to `path` + `line`. Never auto-post.

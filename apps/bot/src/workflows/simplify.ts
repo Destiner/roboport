@@ -136,16 +136,20 @@ async function handleSimplifyReply(
   const repo = event.repository.full_name;
   const number = event.pull_request.number;
   const tag = `${repo}#${number}`;
+  // in_reply_to_id is always set here — isReplyActionable gates on it.
+  const rootId = event.comment.in_reply_to_id;
+  if (rootId === undefined) return;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-apply-'));
   // No head-sha check run fits the reply path (it commits back to the branch),
   // so acknowledge progress with a placeholder reply in the thread. The agent
   // posts the real outcome (a commit link, an answer, or nothing), so on
   // success the placeholder is deleted; on failure it becomes an error note.
-  const rootId = event.comment.in_reply_to_id;
-  const placeholderId =
-    rootId === undefined
-      ? null
-      : await postThreadReply(repo, number, rootId, '🤖 _Working on it…_');
+  const placeholderId = await postThreadReply(
+    repo,
+    number,
+    rootId,
+    '🤖 _Working on it…_',
+  );
   try {
     await using session = agent.session();
     await session.send(buildApplyPrompt(event, workspace, config));

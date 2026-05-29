@@ -7,13 +7,14 @@ async function ghApi<T = unknown>(
   args: string[],
   body?: unknown,
 ): Promise<T | null> {
+  const hasBody = body !== undefined;
   const proc = Bun.spawn(['gh', 'api', ...args], {
-    stdin: body === undefined ? 'ignore' : 'pipe',
+    stdin: hasBody ? 'pipe' : 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
     env: process.env,
   });
-  if (body !== undefined) {
+  if (hasBody) {
     proc.stdin?.write(JSON.stringify(body));
     proc.stdin?.end();
   }
@@ -70,6 +71,19 @@ async function startCheckRun(
   };
 }
 
+// The PR's current head SHA. docs-update can push a [skip ci] commit mid-run
+// that advances the head, so handlers re-resolve it to anchor a check on the
+// commit the PR now shows rather than the one the webhook fired on.
+async function prHeadSha(
+  repo: string,
+  prNumber: number,
+): Promise<string | null> {
+  const pr = await ghApi<{ head?: { sha?: string } }>([
+    `repos/${repo}/pulls/${prNumber}`,
+  ]);
+  return pr?.head?.sha ?? null;
+}
+
 // Post a reply into an existing inline review-comment thread (anchored to the
 // root comment) and return the new comment's id, or null on failure.
 async function postThreadReply(
@@ -121,6 +135,7 @@ async function deleteReviewComment(
 
 export {
   startCheckRun,
+  prHeadSha,
   postThreadReply,
   editReviewComment,
   deleteReviewComment,

@@ -37,7 +37,7 @@ Audit PR #${number} in ${repo} for developer experience (DX) and agent experienc
    - cd repo && gh pr checkout ${number}
 2. First, decide whether this PR changes the PUBLIC SURFACE — exported symbols, API endpoints, error types, public types, CLI flags, tool/MCP definitions, or configuration/environment contracts that a consumer depends on. If it does NOT touch the public surface, print "no surface change" and STOP — post nothing.
 3. If it does touch the public surface, apply the developer-experience skill with scope = this PR's diff (the surface the change adds, removes, or alters, plus its immediate blast radius). Report only papercuts the change itself introduces or worsens — not pre-existing debt it merely sits next to.
-4. Post the findings as a single summary comment via \`gh pr review ${number} --comment\`. Always use --comment; never --approve or --request-changes. Use the skill's output format and verdict verbatim. If there is nothing the change introduces worth raising, print "no surface change" and post nothing.
+4. Post the findings as a single summary comment: write the report (the skill's output format and verdict verbatim) to ${workspace}/audit.md, then post it with \`gh pr review ${number} --comment --body-file ${workspace}/audit.md\`. Always use --comment; never --approve or --request-changes — a DX papercut must not gate a merge. If there is nothing the change introduces worth raising, print "no surface change" and post nothing.
 
 The GH_TOKEN env var is set and gh is authenticated.`;
 }

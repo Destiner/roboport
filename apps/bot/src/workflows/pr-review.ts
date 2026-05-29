@@ -37,11 +37,11 @@ Review PR #${number} in ${repo}.
    - cd repo && gh pr checkout ${number}
 2. Apply the pr-review skill. Stay on the merge-judgment axis — correctness, security, design fit, tests, conventions, API contract. Omit the Nits section and any pure style, naming, or simplification suggestions: a separate code-simplifier pass owns those, and duplicating them here just adds noise.
 3. Post your findings to GitHub (you are authorized):
-   - First, the summary review via \`gh pr review ${number}\`, passing the full report as \`--body\` and choosing the action from the skill's verdict line:
+   - First, the summary review. Write the full report (the pr-review skill's format verbatim: overview → findings → verdict) to ${workspace}/review.md, then submit it with \`gh pr review ${number} --body-file ${workspace}/review.md\` plus the action flag for the verdict. This mapping is authoritative — it overrides the skill's posting examples:
      - \`Approve\` → \`--approve\`
      - \`Approve with must-fixes\` → \`--request-changes\` (the must-fixes gate the merge until addressed)
      - \`Request changes\` → \`--request-changes\`
-     Use the output format from the pr-review skill verbatim (overview → findings → verdict). Submit exactly one review. A later push re-runs this workflow, and the fresh verdict supersedes the prior one.
+     Submit exactly one review. A later push re-runs this workflow, and the fresh verdict supersedes the prior one.
    - Then, one inline comment per line-level finding via gh api repos/${repo}/pulls/${number}/comments.
    Skip inline comments if there are no line-level findings.
 

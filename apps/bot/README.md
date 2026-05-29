@@ -30,6 +30,14 @@ The bot opens a check run per workflow (`drone / pr-review`, `drone / docs`,
 shows in the PR UI. These are advisory — they conclude `neutral`, never gating
 a merge; do not add them to branch protection's required checks.
 
+Separately, `pr-review` submits a **review verdict**: `Approve` posts an
+approval, while `Approve with must-fixes` and `Request changes` post
+`--request-changes`, which blocks the merge until cleared. A later push re-runs
+the workflow and the new verdict supersedes the old one, so a stale
+request-changes self-clears. Unlike the check runs this is a *gating* surface —
+factor it into branch-protection settings. (`dx-audit` stays advisory: it only
+ever comments.)
+
 Optional:
 
 - `GITHUB_APP_INSTALLATION_ID` — required only if the app is installed in more than one place; otherwise auto-discovered
