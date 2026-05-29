@@ -2,10 +2,10 @@ import { createSign } from 'node:crypto';
 
 // GitHub App auth: sign a short-lived JWT with the app private key, exchange it
 // for an installation access token, and keep that token in process.env.GH_TOKEN.
-// The harness shell tool inherits process.env, so every gh/git call the
-// workflows spawn picks the current token up automatically (Bun.spawn with no
-// explicit env). Installation tokens last ~1h and rotate; syncToken() refreshes
-// them ahead of expiry.
+// Callers must spawn gh/git with env: process.env so the token reaches them —
+// Bun seeds child env from a startup snapshot and ignores later mutations.
+// Installation tokens last ~1h and rotate; syncToken() refreshes them ahead of
+// expiry.
 
 const API = 'https://api.github.com';
 const USER_AGENT = 'drone-bot';
