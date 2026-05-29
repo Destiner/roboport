@@ -1,30 +1,47 @@
 ---
 name: developer-experience
-description: Reviews an SDK or API repo as a linter for developer experience and agent experience (AX). Surfaces papercuts: friction, inconsistent naming, unidiomatic REST, weak errors, untyped boundaries, and patterns that make the surface hard for LLM-driven agents to consume. Use when the user asks to audit an SDK / API for DX, AX, ergonomics, or how it feels to use.
+description: Reviews a software surface — a whole repo, an SDK/API, a diff or PR, a single commit, a single file, or a design proposal — as a linter for developer experience (DX) and agent experience (AX). Surfaces papercuts: friction, inconsistent naming, unidiomatic REST, weak errors, untyped boundaries, and patterns that make the surface hard for LLM-driven agents to consume. Use when the user asks to audit DX, AX, ergonomics, or how a surface feels to use, at any scope.
 ---
 
 # Developer experience
 
-Review an SDK or API repo as a *linter for developer experience*. Surface papercuts — friction (the user had to know something undocumented to succeed) and inconsistency (the same concept named, shaped, or behaved-with two different ways). Equally evaluates **agent experience** (AX): how easily an LLM-driven agent can use the surface.
+Review a software surface as a *linter for developer experience*. Surface papercuts — friction (the user had to know something undocumented to succeed) and inconsistency (the same concept named, shaped, or behaved-with two different ways). Equally evaluates **agent experience** (AX): how easily an LLM-driven agent can use the surface.
 
-This skill runs on a *whole repo*, not a diff. Out of scope: refactoring the code, writing user-facing docs, reviewing a single diff.
+Out of scope: refactoring the code, writing user-facing docs.
 
-## How to make a whole-repo review tractable
+## Scope
 
-Three passes. Without them the review drowns.
+This skill adapts to the *surface area* under review. Decide it from what you were asked:
 
-1. **Surface map.** Enumerate the public surface only: exported endpoints (router files, OpenAPI), exported SDK symbols (`index.ts`, `package.json#exports`), error classes, README's quickstart. Skip internals.
-2. **Sample.** Pick 3–5 representative resources / endpoints / tools and review them deeply against the dimensions below. The goal is *patterns*, not coverage.
-3. **Cross-cut.** For each finding, ask: is this a one-off or repo-wide? Repo-wide drift outranks a single offender.
+- **Whole repo / SDK / API** — the full public surface.
+- **A diff or PR** — only the surface the change adds, removes, or alters, plus its immediate blast radius.
+- **A single commit** — the surface that commit touches.
+- **A single file or module** — the public surface that file exposes.
+- **A proposal / RFC / design doc** — the surface as *described*; there is no code to read yet.
+- Ambiguous → ask which.
 
-Result: review cost is O(surface), not O(LOC).
+The dimensions, the citation rule, and the what-not-to-flag list below are identical at every scope. Only *what you read* and *how you bound the review* change.
+
+## How to make the review tractable
+
+Match the method to the scope. Three passes keep any scope from drowning:
+
+1. **Map the surface.** Enumerate the public surface only — skip internals.
+   - Repo / SDK / API: exported endpoints (router files, OpenAPI), exported symbols (`index.ts`, `package.json#exports`), error classes, the README quickstart.
+   - Diff / commit: only the public symbols the change adds, removes, or alters.
+   - File: the symbols that file exports.
+   - Proposal: the surface the document describes.
+2. **Sample.** For a large surface, pick 3–5 representative resources / endpoints / tools and review them deeply against the dimensions below. The goal is *patterns*, not coverage. For a diff-sized or single-file surface, review all of it.
+3. **Place each finding.** Ask: is this **local** (this one symbol) or **systemic** (a pattern across the surface, or drift the change introduces against an existing convention)? Systemic outranks local.
+
+Result: review cost is O(surface under review), not O(LOC).
 
 ## The citation rule
 
 Every finding must cite either:
 
 - A public reference — Stripe error docs, Google AIP, Microsoft REST guidelines, JSON:API §, Anthropic's "Writing tools for agents", RFC 9457, etc. *or*
-- The repo's own internal inconsistency — endpoint A does X, endpoint B does Y.
+- The surface's own internal inconsistency — endpoint A does X, endpoint B does Y.
 
 If neither applies, drop it. "I would have…" is not a citation. This is the single biggest guardrail against taste-creep.
 
@@ -65,7 +82,8 @@ Where DX and AX diverge. These are the concrete checks defensible today — skip
 - Performance speculation without a measurement.
 - Protocol religion (REST vs GraphQL vs gRPC).
 - Choices a framework forces.
-- Single-occurrence naming nits when the repo convention is otherwise consistent.
+- Single-occurrence naming nits when the convention is otherwise consistent.
+- When the scope is a diff or commit: pre-existing papercuts outside the surface the change touches — note systemic drift the change *introduces*, not debt it merely sits next to.
 
 ## Output
 
@@ -73,7 +91,7 @@ Markdown, sections optional — omit any that's empty:
 
 ```
 ## Papercuts (blocking)
-- <statement>. `src/path.ts:42` — <why it hurts, citing rule or repo inconsistency>
+- <statement>. `src/path.ts:42` — <why it hurts, citing rule or surface inconsistency>
 
 ## Worth addressing
 - ...
@@ -85,6 +103,6 @@ Markdown, sections optional — omit any that's empty:
 - <AX-specific findings, separated because the fix audience may differ>
 ```
 
-End with one line — a verdict. One of: `Idiomatic`, `Idiomatic with rough edges`, `Needs work`, `Hostile to agents`.
+End with one line — a verdict on the surface under review. One of: `Idiomatic`, `Idiomatic with rough edges`, `Needs work`, `Hostile to agents`. When reviewing a proposal, frame each finding against the surface it *would* create and phrase the verdict accordingly.
 
-No numeric scores. No praise section. Every finding cites a file/line or a public reference.
+No numeric scores. No praise section. Every finding cites a file/line (or, for a proposal, the section it refers to) or a public reference.

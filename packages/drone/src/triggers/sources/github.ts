@@ -61,6 +61,16 @@ interface GithubComment {
   html_url: string;
 }
 
+interface GithubReviewComment extends GithubComment {
+  path: string;
+  line: number | null;
+  start_line: number | null;
+  commit_id: string;
+  diff_hunk: string;
+  pull_request_review_id: number | null;
+  in_reply_to_id?: number;
+}
+
 interface GithubPushCommit {
   id: string;
   message: string;
@@ -87,6 +97,14 @@ interface IssueCommentEvent {
   action: string;
   issue: GithubIssue;
   comment: GithubComment;
+  repository: GithubRepository;
+  sender: GithubUser;
+}
+
+interface PullRequestReviewCommentEvent {
+  action: string;
+  comment: GithubReviewComment;
+  pull_request: GithubPullRequest;
   repository: GithubRepository;
   sender: GithubUser;
 }
@@ -178,6 +196,7 @@ class DeliveryCache {
 class GithubReceiver {
   private prBus = makeBus<PullRequestEvent>();
   private issueCommentBus = makeBus<IssueCommentEvent>();
+  private reviewCommentBus = makeBus<PullRequestReviewCommentEvent>();
   private issuesBus = makeBus<IssuesEvent>();
   private pushBus = makeBus<PushEvent>();
   private readonly secret: string;
@@ -212,6 +231,22 @@ class GithubReceiver {
     const actions = opts?.actions;
     return {
       name: 'github:issue_comment',
+      start: (emit) =>
+        subscribe(
+          bus,
+          emit,
+          actions ? (e): boolean => actions.includes(e.action) : undefined,
+        ),
+    };
+  }
+
+  pullRequestReviewComment(opts?: {
+    actions?: string[];
+  }): Trigger<PullRequestReviewCommentEvent> {
+    const bus = this.reviewCommentBus;
+    const actions = opts?.actions;
+    return {
+      name: 'github:pull_request_review_comment',
       start: (emit) =>
         subscribe(
           bus,
@@ -278,6 +313,12 @@ class GithubReceiver {
       case 'issue_comment':
         dispatch(this.issueCommentBus, payload as IssueCommentEvent);
         break;
+      case 'pull_request_review_comment':
+        dispatch(
+          this.reviewCommentBus,
+          payload as PullRequestReviewCommentEvent,
+        );
+        break;
       case 'issues':
         dispatch(this.issuesBus, payload as IssuesEvent);
         break;
@@ -307,9 +348,11 @@ export {
   type GithubPushCommit,
   type GithubReceiverOptions,
   type GithubRepository,
+  type GithubReviewComment,
   type GithubUser,
   type IssueCommentEvent,
   type IssuesEvent,
   type PullRequestEvent,
+  type PullRequestReviewCommentEvent,
   type PushEvent,
 };

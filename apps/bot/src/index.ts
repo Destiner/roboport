@@ -1,4 +1,8 @@
-import { githubTrigger, type PullRequestEvent } from 'drone/triggers';
+import {
+  githubTrigger,
+  type PullRequestEvent,
+  type PullRequestReviewCommentEvent,
+} from 'drone/triggers';
 import { Hono } from 'hono';
 
 import { loadConfig } from './config';
@@ -6,7 +10,14 @@ import {
   createDocsUpdateAgent,
   handleDocsUpdate,
 } from './workflows/docs-update';
+import { createDxAuditAgent, handleDxAudit } from './workflows/dx-audit';
 import { createPrReviewAgent, handlePrReview } from './workflows/pr-review';
+import {
+  createSimplifyAgent,
+  handleSimplifyIdeas,
+  handleSimplifyReply,
+  SIMPLIFY_IDEA_MARKER,
+} from './workflows/simplify';
 
 const config = loadConfig();
 
@@ -22,10 +33,24 @@ if (ghAuthSetup.exitCode !== 0) {
   throw new Error(`gh auth setup-git failed: ${stderr}`);
 }
 
+function resolveBotLogin(): string {
+  const proc = Bun.spawnSync(['gh', 'api', 'user', '--jq', '.login']);
+  if (proc.exitCode !== 0) {
+    const stderr = new TextDecoder().decode(proc.stderr);
+    throw new Error(`gh api user failed: ${stderr}`);
+  }
+  return new TextDecoder().decode(proc.stdout).trim();
+}
+
+// The account the bot posts as; used to recognise its own review threads.
+const botLogin = resolveBotLogin();
+
 const ghReceiver = githubTrigger({ secret: config.webhookSecret });
 
 const prReviewAgent = createPrReviewAgent(config);
 const docsUpdateAgent = createDocsUpdateAgent(config);
+const simplifyAgent = createSimplifyAgent(config);
+const dxAuditAgent = createDxAuditAgent(config);
 
 const SKIP_CI_PATTERN = /\[(?:skip[ -]ci|ci[ -]skip|no ci)\]/i;
 
@@ -51,7 +76,14 @@ async function headCommitMessage(
 
 async function isEventActionable(event: PullRequestEvent): Promise<boolean> {
   if (event.pull_request.draft) return false;
-  if (!config.allowedActors.includes(event.sender.login)) return false;
+  // The bot is allowed here (so its own pushes re-trigger review) but not in
+  // isReplyActionable, so it never acts on its own review-thread replies.
+  if (
+    !config.allowedActors.includes(event.sender.login) &&
+    event.sender.login !== botLogin
+  ) {
+    return false;
+  }
   if (event.pull_request.head.repo?.full_name !== event.repository.full_name) {
     return false;
   }
@@ -64,6 +96,54 @@ async function isEventActionable(event: PullRequestEvent): Promise<boolean> {
     }
   }
   return true;
+}
+
+async function reviewComment(
+  repo: string,
+  commentId: number,
+): Promise<{ author: string; body: string } | null> {
+  const proc = Bun.spawn(
+    ['gh', 'api', `repos/${repo}/pulls/comments/${commentId}`],
+    { stdout: 'pipe', stderr: 'pipe' },
+  );
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    console.error(
+      `[bot] gh api failed for ${repo} comment ${commentId}: ${stderr.trim() || `exit ${exitCode}`}`,
+    );
+    return null;
+  }
+  try {
+    const data = (await new Response(proc.stdout).json()) as {
+      user?: { login?: string };
+      body?: string;
+    };
+    return { author: data.user?.login ?? '', body: data.body ?? '' };
+  } catch {
+    return null;
+  }
+}
+
+// Act only on replies by an allowed actor under one of the bot's own inline
+// simplification ideas. pr-review also posts bot-authored inline comments, so
+// authorship alone is not enough — the root must carry the simplify marker.
+async function isReplyActionable(
+  event: PullRequestReviewCommentEvent,
+): Promise<boolean> {
+  if (event.action !== 'created') return false;
+  // Never act on the bot's own replies, even if botLogin is in allowedActors.
+  if (event.sender.login === botLogin) return false;
+  if (event.pull_request.draft) return false;
+  if (!config.allowedActors.includes(event.sender.login)) return false;
+  if (event.pull_request.head.repo?.full_name !== event.repository.full_name) {
+    return false;
+  }
+  const rootId = event.comment.in_reply_to_id;
+  if (rootId === undefined) return false;
+  const root = await reviewComment(event.repository.full_name, rootId);
+  if (root === null) return false;
+  return root.author === botLogin && root.body.includes(SIMPLIFY_IDEA_MARKER);
 }
 
 const prTrigger = ghReceiver.pullRequest({
@@ -84,8 +164,44 @@ docsUpdateAgent.on(prTrigger, async (event) => {
   await handleDocsUpdate(docsUpdateAgent, event, config);
 });
 
+const simplifyIdeasTrigger = ghReceiver.pullRequest({
+  actions: ['opened', 'ready_for_review'],
+});
+const reviewCommentTrigger = ghReceiver.pullRequestReviewComment({
+  actions: ['created'],
+});
+
+simplifyAgent.on(simplifyIdeasTrigger, async (event) => {
+  if (!(await isEventActionable(event))) return;
+  const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[bot] dispatch simplify-ideas ${tag} action=${event.action}`);
+  await handleSimplifyIdeas(simplifyAgent, event);
+});
+
+simplifyAgent.on(reviewCommentTrigger, async (event) => {
+  if (!(await isReplyActionable(event))) return;
+  const tag = `${event.repository.full_name}#${event.pull_request.number}`;
+  console.log(
+    `[bot] dispatch simplify-apply ${tag} comment=${event.comment.id}`,
+  );
+  await handleSimplifyReply(simplifyAgent, event, config);
+});
+
+const dxAuditTrigger = ghReceiver.pullRequest({
+  actions: ['opened', 'ready_for_review'],
+});
+
+dxAuditAgent.on(dxAuditTrigger, async (event) => {
+  if (!(await isEventActionable(event))) return;
+  const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[bot] dispatch dx-audit ${tag} action=${event.action}`);
+  await handleDxAudit(dxAuditAgent, event);
+});
+
 await prReviewAgent.start();
 await docsUpdateAgent.start();
+await simplifyAgent.start();
+await dxAuditAgent.start();
 
 const app = new Hono();
 app.get('/', (c) => c.text('ok'));

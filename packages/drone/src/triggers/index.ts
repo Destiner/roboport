@@ -9,9 +9,11 @@ import { cron, type CronEvent } from './sources/cron';
 import {
   githubTrigger,
   GithubReceiver,
+  type GithubReviewComment,
   type IssueCommentEvent,
   type IssuesEvent,
   type PullRequestEvent,
+  type PullRequestReviewCommentEvent,
   type PushEvent,
 } from './sources/github';
 import {
@@ -38,6 +40,7 @@ export {
   trigger,
   type CronEvent,
   type Emit,
+  type GithubReviewComment,
   type GrafanaAlertEvent,
   type IssueCommentEvent,
   type IssuesEvent,
@@ -45,6 +48,7 @@ export {
   type LinearIssueEvent,
   type LinearProjectEvent,
   type PullRequestEvent,
+  type PullRequestReviewCommentEvent,
   type PushEvent,
   type Trigger,
   type TriggerHandler,
