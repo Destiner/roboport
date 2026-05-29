@@ -10,6 +10,7 @@ import {
   createDocsUpdateAgent,
   handleDocsUpdate,
 } from './workflows/docs-update';
+import { createDxAuditAgent, handleDxAudit } from './workflows/dx-audit';
 import { createPrReviewAgent, handlePrReview } from './workflows/pr-review';
 import {
   createSimplifyAgent,
@@ -48,6 +49,7 @@ const ghReceiver = githubTrigger({ secret: config.webhookSecret });
 const prReviewAgent = createPrReviewAgent(config);
 const docsUpdateAgent = createDocsUpdateAgent(config);
 const simplifyAgent = createSimplifyAgent(config);
+const dxAuditAgent = createDxAuditAgent(config);
 
 const SKIP_CI_PATTERN = /\[(?:skip[ -]ci|ci[ -]skip|no ci)\]/i;
 
@@ -174,9 +176,21 @@ simplifyAgent.on(reviewCommentTrigger, async (event) => {
   await handleSimplifyReply(simplifyAgent, event, config);
 });
 
+const dxAuditTrigger = ghReceiver.pullRequest({
+  actions: ['opened', 'ready_for_review'],
+});
+
+dxAuditAgent.on(dxAuditTrigger, async (event) => {
+  if (!(await isEventActionable(event))) return;
+  const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[bot] dispatch dx-audit ${tag} action=${event.action}`);
+  await handleDxAudit(dxAuditAgent, event);
+});
+
 await prReviewAgent.start();
 await docsUpdateAgent.start();
 await simplifyAgent.start();
+await dxAuditAgent.start();
 
 const app = new Hono();
 app.get('/', (c) => c.text('ok'));
