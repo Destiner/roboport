@@ -34,7 +34,7 @@ Review PR #${number} in ${repo}.
 1. Clone the repo and check out the PR head:
    - gh repo clone ${repo} repo
    - cd repo && gh pr checkout ${number}
-2. Apply the pr-review skill.
+2. Apply the pr-review skill. Stay on the merge-judgment axis — correctness, security, design fit, tests, conventions, API contract. Omit the Nits section and any pure style, naming, or simplification suggestions: a separate code-simplifier pass owns those, and duplicating them here just adds noise.
 3. Post your findings to GitHub (you are authorized):
    - First, the summary review via \`gh pr review ${number} --comment\`. Always use --comment; never --approve or --request-changes (GitHub refuses both on the PAT owner's own PRs). Use the output format from the pr-review skill verbatim (overview → findings → verdict).
    - Then, one inline comment per line-level finding via gh api repos/${repo}/pulls/${number}/comments.
