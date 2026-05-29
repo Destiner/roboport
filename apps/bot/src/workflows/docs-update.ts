@@ -9,6 +9,7 @@ import { docsUpdate } from 'drone/skills';
 import type { PullRequestEvent } from 'drone/triggers';
 
 import type { Config } from '../config';
+import { prHeadSha, startCheckRun } from '../github';
 import { logMessages } from '../log';
 
 function createDocsUpdateAgent(config: Config): Agent {
@@ -59,15 +60,29 @@ async function handleDocsUpdate(
   event: PullRequestEvent,
   config: Config,
 ): Promise<void> {
-  const tag = `${event.repository.full_name}#${event.number}`;
+  const repo = event.repository.full_name;
+  const startSha = event.pull_request.head.sha;
+  const tag = `${repo}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-docs-update-'));
+  const check = await startCheckRun(repo, startSha, 'drone / docs');
+  const summary = 'Checked the internal docs against the PR diff.';
   try {
     await using session = agent.session();
     await session.send(buildPrompt(event, workspace, config));
     logMessages(`docs-update:${tag}`, [...session.messages]);
+    await check?.complete('neutral', 'Docs check complete', summary);
+    // The agent may have pushed a docs commit, advancing the head to a commit
+    // that won't re-trigger this workflow (it carries [skip ci] and is the
+    // bot's own push), so mirror the completion onto the new head as well.
+    const headSha = await prHeadSha(repo, event.number);
+    if (headSha !== null && headSha !== startSha) {
+      const headCheck = await startCheckRun(repo, headSha, 'drone / docs');
+      await headCheck?.complete('neutral', 'Docs check complete', summary);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] docs-update failed for ${tag}: ${message}`);
+    await check?.complete('failure', 'Docs check failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

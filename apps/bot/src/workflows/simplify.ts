@@ -12,6 +12,12 @@ import type {
 } from 'drone/triggers';
 
 import type { Config } from '../config';
+import {
+  deleteReviewComment,
+  editReviewComment,
+  postThreadReply,
+  startCheckRun,
+} from '../github';
 import { logMessages } from '../log';
 
 // Appended to every simplification idea comment so review-comment replies can be
@@ -99,13 +105,24 @@ async function handleSimplifyIdeas(
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-ideas-'));
+  const check = await startCheckRun(
+    event.repository.full_name,
+    event.pull_request.head.sha,
+    'drone / simplify',
+  );
   try {
     await using session = agent.session();
     await session.send(buildIdeasPrompt(event, workspace));
     logMessages(`simplify-ideas:${tag}`, [...session.messages]);
+    await check?.complete(
+      'neutral',
+      'Simplify scan complete',
+      'Scanned the PR diff for behaviour-preserving simplifications.',
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] simplify-ideas failed for ${tag}: ${message}`);
+    await check?.complete('failure', 'Simplify scan failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
@@ -116,15 +133,38 @@ async function handleSimplifyReply(
   event: PullRequestReviewCommentEvent,
   config: Config,
 ): Promise<void> {
-  const tag = `${event.repository.full_name}#${event.pull_request.number}`;
+  const repo = event.repository.full_name;
+  const number = event.pull_request.number;
+  const tag = `${repo}#${number}`;
+  // in_reply_to_id is always set here — isReplyActionable gates on it.
+  const rootId = event.comment.in_reply_to_id;
+  if (rootId === undefined) return;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-apply-'));
+  // No head-sha check run fits the reply path (it commits back to the branch),
+  // so acknowledge progress with a placeholder reply in the thread. The agent
+  // posts the real outcome (a commit link, an answer, or nothing), so on
+  // success the placeholder is deleted; on failure it becomes an error note.
+  const placeholderId = await postThreadReply(
+    repo,
+    number,
+    rootId,
+    '🤖 _Working on it…_',
+  );
   try {
     await using session = agent.session();
     await session.send(buildApplyPrompt(event, workspace, config));
     logMessages(`simplify-apply:${tag}`, [...session.messages]);
+    if (placeholderId !== null) await deleteReviewComment(repo, placeholderId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] simplify-apply failed for ${tag}: ${message}`);
+    if (placeholderId !== null) {
+      await editReviewComment(
+        repo,
+        placeholderId,
+        '🤖 _I hit an error applying this. Check the bot logs._',
+      );
+    }
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
