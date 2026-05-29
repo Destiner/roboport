@@ -21,9 +21,14 @@ Required:
 - `GITHUB_WEBHOOK_SECRET` — same secret configured on the app webhook
 - `DRONE_ALLOWED_ACTORS` — comma-separated GitHub logins permitted to trigger workflows
 
-App permissions: **Contents: Read & write** and **Pull requests: Read & write**
-(plus the mandatory **Metadata: Read-only**). Webhook events: **Pull request**
-and **Pull request review comment**.
+App permissions: **Contents: Read & write**, **Pull requests: Read & write**,
+and **Checks: Read & write** (plus the mandatory **Metadata: Read-only**).
+Webhook events: **Pull request** and **Pull request review comment**.
+
+The bot opens a check run per workflow (`drone / pr-review`, `drone / docs`,
+`drone / simplify`, `drone / dx-audit`) on the PR head commit so its progress
+shows in the PR UI. These are advisory — they conclude `neutral`, never gating
+a merge; do not add them to branch protection's required checks.
 
 Optional:
 

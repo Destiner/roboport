@@ -9,6 +9,7 @@ import { docsUpdate } from 'drone/skills';
 import type { PullRequestEvent } from 'drone/triggers';
 
 import type { Config } from '../config';
+import { startCheckRun } from '../github';
 import { logMessages } from '../log';
 
 function createDocsUpdateAgent(config: Config): Agent {
@@ -61,13 +62,24 @@ async function handleDocsUpdate(
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
   const workspace = await mkdtemp(join(tmpdir(), 'drone-docs-update-'));
+  const check = await startCheckRun(
+    event.repository.full_name,
+    event.pull_request.head.sha,
+    'drone / docs',
+  );
   try {
     await using session = agent.session();
     await session.send(buildPrompt(event, workspace, config));
     logMessages(`docs-update:${tag}`, [...session.messages]);
+    await check?.complete(
+      'neutral',
+      'Docs check complete',
+      'Checked the internal docs against the PR diff.',
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[bot] docs-update failed for ${tag}: ${message}`);
+    await check?.complete('failure', 'Docs check failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
