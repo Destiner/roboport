@@ -1,10 +1,14 @@
+import type { GithubAppCredentials } from './github-app';
+
 interface Config {
   port: number;
   webhookSecret: string;
   allowedActors: string[];
+  // Empty until resolved at startup: an override, else the app's bot identity.
   gitUserName: string;
   gitUserEmail: string;
   codexAuthFile: string;
+  app: GithubAppCredentials;
 }
 
 function readEnv(name: string): string {
@@ -18,7 +22,6 @@ function readOptional(name: string, fallback: string): string {
 }
 
 function loadConfig(): Config {
-  readEnv('GH_TOKEN');
   return {
     port: Number(readOptional('PORT', '3000')),
     webhookSecret: readEnv('GITHUB_WEBHOOK_SECRET'),
@@ -26,12 +29,17 @@ function loadConfig(): Config {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    gitUserName: readEnv('DRONE_GIT_USER_NAME'),
-    gitUserEmail: readEnv('DRONE_GIT_USER_EMAIL'),
+    gitUserName: readOptional('DRONE_GIT_USER_NAME', ''),
+    gitUserEmail: readOptional('DRONE_GIT_USER_EMAIL', ''),
     codexAuthFile: readOptional(
       'DRONE_OPENAI_CODEX_AUTH_FILE',
       '/data/openai-codex-auth.json',
     ),
+    app: {
+      appId: readEnv('GITHUB_APP_ID'),
+      privateKey: readEnv('GITHUB_APP_PRIVATE_KEY'),
+      installationId: process.env.GITHUB_APP_INSTALLATION_ID || undefined,
+    },
   };
 }
 
