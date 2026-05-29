@@ -9,15 +9,26 @@ Webhook-driven runner for drone agents. Receives GitHub webhooks and dispatches 
 
 ## Environment
 
+The bot authenticates as a GitHub App: it signs a JWT with the app private key,
+exchanges it for a short-lived installation token, and keeps that token in
+`GH_TOKEN` (rotated automatically) so `gh`/`git` post and push as the app's
+`<app-slug>[bot]` identity.
+
 Required:
 
-- `GH_TOKEN` — fine-grained PAT with `contents: write` and `pull-requests: write` on the target repo
-- `GITHUB_WEBHOOK_SECRET` — same secret configured on the repo webhook
+- `GITHUB_APP_ID` — the app's numeric App ID
+- `GITHUB_APP_PRIVATE_KEY` — the app private key PEM (raw, `\n`-escaped, or base64-encoded)
+- `GITHUB_WEBHOOK_SECRET` — same secret configured on the app webhook
 - `DRONE_ALLOWED_ACTORS` — comma-separated GitHub logins permitted to trigger workflows
-- `DRONE_GIT_USER_NAME`, `DRONE_GIT_USER_EMAIL` — git identity used by docs-update commits
+
+App permissions: **Contents: Read & write** and **Pull requests: Read & write**
+(plus the mandatory **Metadata: Read-only**). Webhook events: **Pull request**
+and **Pull request review comment**.
 
 Optional:
 
+- `GITHUB_APP_INSTALLATION_ID` — required only if the app is installed in more than one place; otherwise auto-discovered
+- `DRONE_GIT_USER_NAME`, `DRONE_GIT_USER_EMAIL` — override the commit author; default to the app's bot identity so commits link to the app
 - `PORT` (default `3000`)
 - `DRONE_OPENAI_CODEX_AUTH_FILE` (default `/data/openai-codex-auth.json`) — codex auth/refresh-token store
 
@@ -26,7 +37,7 @@ Optional:
 - Build context: monorepo root
 - Dockerfile: `apps/bot/Dockerfile`
 - Volume: mount at `/data`. Seed `openai-codex-auth.json` once with a Codex grant **dedicated to the bot** — do not reuse your personal `~/.codex/auth.json`. Codex refresh tokens are single-use and rotate on every refresh, so two holders of the same `auth.json` invalidate each other (`refresh_token_reused`). Mint an isolated grant (e.g. via a separate `CODEX_HOME`) and copy it onto the volume; the bot refreshes it in place as tokens rotate.
-- Webhook: point your GitHub repo webhook at `https://<service>/webhooks/github`, content type `application/json`, with the same secret as `GITHUB_WEBHOOK_SECRET`. Subscribe to **Pull requests** and **Pull request review comments** (the latter drives the simplify reply-to-apply path).
+- Webhook: configured once on the GitHub App (Settings → your app → Webhook). Point it at `https://<service>/webhooks/github`, content type `application/json`, with the same secret as `GITHUB_WEBHOOK_SECRET`. Subscribe to **Pull request** and **Pull request review comment** events (the latter drives the simplify reply-to-apply path).
 
 ## Local dev
 

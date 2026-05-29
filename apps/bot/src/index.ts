@@ -6,6 +6,7 @@ import {
 import { Hono } from 'hono';
 
 import { loadConfig } from './config';
+import { GithubApp } from './github-app';
 import {
   createDocsUpdateAgent,
   handleDocsUpdate,
@@ -21,6 +22,17 @@ import {
 
 const config = loadConfig();
 
+// Authenticate as the GitHub App: mint an installation token, publish it to
+// process.env.GH_TOKEN (inherited by every gh/git subprocess), and learn the
+// bot's identity before configuring git or wiring triggers.
+const githubApp = new GithubApp(config.app);
+await githubApp.init();
+
+// Fall back to the app's bot identity when no explicit git author is set, so
+// commits link to the app instead of a person.
+if (!config.gitUserName) config.gitUserName = githubApp.botName;
+if (!config.gitUserEmail) config.gitUserEmail = githubApp.botEmail;
+
 const ghAuthSetup = Bun.spawnSync([
   'gh',
   'auth',
@@ -33,17 +45,8 @@ if (ghAuthSetup.exitCode !== 0) {
   throw new Error(`gh auth setup-git failed: ${stderr}`);
 }
 
-function resolveBotLogin(): string {
-  const proc = Bun.spawnSync(['gh', 'api', 'user', '--jq', '.login']);
-  if (proc.exitCode !== 0) {
-    const stderr = new TextDecoder().decode(proc.stderr);
-    throw new Error(`gh api user failed: ${stderr}`);
-  }
-  return new TextDecoder().decode(proc.stdout).trim();
-}
-
 // The account the bot posts as; used to recognise its own review threads.
-const botLogin = resolveBotLogin();
+const botLogin = githubApp.botLogin;
 
 const ghReceiver = githubTrigger({ secret: config.webhookSecret });
 
@@ -205,7 +208,12 @@ await dxAuditAgent.start();
 
 const app = new Hono();
 app.get('/', (c) => c.text('ok'));
-app.post('/webhooks/github', (c) => ghReceiver.handle(c.req.raw));
+app.post('/webhooks/github', async (c) => {
+  // Keep GH_TOKEN fresh before handlers (and their gh/git calls) run; no-op
+  // until the installation token nears expiry.
+  await githubApp.syncToken();
+  return ghReceiver.handle(c.req.raw);
+});
 
 console.log(`[bot] listening on :${config.port}`);
 Bun.serve({ port: config.port, fetch: app.fetch });
