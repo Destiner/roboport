@@ -78,14 +78,10 @@ async function headCommitMessage(
 
 async function isEventActionable(event: PullRequestEvent): Promise<boolean> {
   if (event.pull_request.draft) return false;
-  // The bot is allowed here (so its own pushes re-trigger review) but not in
-  // isReplyActionable, so it never acts on its own review-thread replies.
-  if (
-    !config.allowedActors.includes(event.sender.login) &&
-    event.sender.login !== botLogin
-  ) {
-    return false;
-  }
+  // Only allowlisted actors trigger workflows. The bot is deliberately absent
+  // from allowedActors, so this also drops its own pushes (e.g. simplify-apply
+  // commits) rather than re-reviewing them.
+  if (!config.allowedActors.includes(event.sender.login)) return false;
   if (event.pull_request.head.repo?.full_name !== event.repository.full_name) {
     return false;
   }
