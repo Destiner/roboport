@@ -132,6 +132,8 @@ async function isReplyActionable(
   event: PullRequestReviewCommentEvent,
 ): Promise<boolean> {
   if (event.action !== 'created') return false;
+  // Never act on the bot's own replies, even if botLogin is in allowedActors.
+  if (event.sender.login === botLogin) return false;
   if (event.pull_request.draft) return false;
   if (!config.allowedActors.includes(event.sender.login)) return false;
   if (event.pull_request.head.repo?.full_name !== event.repository.full_name) {
