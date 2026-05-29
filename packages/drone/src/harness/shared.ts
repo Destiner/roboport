@@ -37,10 +37,14 @@ async function runShell({
   login?: boolean;
 }): Promise<string> {
   const shellPath = shell ?? 'bash';
+  // Pass env explicitly: Bun seeds child env from a startup snapshot and does
+  // not reflect later process.env mutations, which callers rely on for tokens
+  // set at runtime (e.g. a refreshed GH_TOKEN).
   const proc = Bun.spawn([shellPath, login === false ? '-c' : '-lc', cmd], {
     cwd: workdir,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: process.env,
   });
   const timer = setTimeout(() => proc.kill(), timeout ?? 120_000);
   const [stdout, stderr] = await Promise.all([

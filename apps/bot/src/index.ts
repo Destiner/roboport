@@ -22,9 +22,11 @@ import {
 
 const config = loadConfig();
 
-// Authenticate as the GitHub App: mint an installation token, publish it to
-// process.env.GH_TOKEN (inherited by every gh/git subprocess), and learn the
-// bot's identity before configuring git or wiring triggers.
+// Authenticate as the GitHub App: mint an installation token into
+// process.env.GH_TOKEN, then learn the bot's identity before configuring git
+// or wiring triggers. Bun does not propagate runtime process.env mutations to
+// children implicitly, so every gh/git spawn passes env: process.env (here,
+// below, and in the harness shell tool).
 const githubApp = new GithubApp(config.app);
 await githubApp.init();
 
@@ -33,13 +35,10 @@ await githubApp.init();
 if (!config.gitUserName) config.gitUserName = githubApp.botName;
 if (!config.gitUserEmail) config.gitUserEmail = githubApp.botEmail;
 
-const ghAuthSetup = Bun.spawnSync([
-  'gh',
-  'auth',
-  'setup-git',
-  '--hostname',
-  'github.com',
-]);
+const ghAuthSetup = Bun.spawnSync(
+  ['gh', 'auth', 'setup-git', '--hostname', 'github.com'],
+  { env: process.env },
+);
 if (ghAuthSetup.exitCode !== 0) {
   const stderr = new TextDecoder().decode(ghAuthSetup.stderr);
   throw new Error(`gh auth setup-git failed: ${stderr}`);
@@ -64,7 +63,7 @@ async function headCommitMessage(
   const sha = event.pull_request.head.sha;
   const proc = Bun.spawn(
     ['gh', 'api', `repos/${repo}/commits/${sha}`, '--jq', '.commit.message'],
-    { stdout: 'pipe', stderr: 'pipe' },
+    { stdout: 'pipe', stderr: 'pipe', env: process.env },
   );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -107,7 +106,7 @@ async function reviewComment(
 ): Promise<{ author: string; body: string } | null> {
   const proc = Bun.spawn(
     ['gh', 'api', `repos/${repo}/pulls/comments/${commentId}`],
-    { stdout: 'pipe', stderr: 'pipe' },
+    { stdout: 'pipe', stderr: 'pipe', env: process.env },
   );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
