@@ -149,15 +149,11 @@ const prTrigger = ghReceiver.pullRequest({
 
 prReviewAgent.on(prTrigger, async (event) => {
   if (!(await isEventActionable(event))) return;
-  const tag = `${event.repository.full_name}#${event.number}`;
-  console.log(`[bot] dispatch pr-review ${tag} action=${event.action}`);
   await handlePrReview(prReviewAgent, event);
 });
 
 docsUpdateAgent.on(prTrigger, async (event) => {
   if (!(await isEventActionable(event))) return;
-  const tag = `${event.repository.full_name}#${event.number}`;
-  console.log(`[bot] dispatch docs-update ${tag} action=${event.action}`);
   await handleDocsUpdate(docsUpdateAgent, event, config);
 });
 
@@ -170,17 +166,11 @@ const reviewCommentTrigger = ghReceiver.pullRequestReviewComment({
 
 simplifyAgent.on(simplifyIdeasTrigger, async (event) => {
   if (!(await isEventActionable(event))) return;
-  const tag = `${event.repository.full_name}#${event.number}`;
-  console.log(`[bot] dispatch simplify-ideas ${tag} action=${event.action}`);
   await handleSimplifyIdeas(simplifyAgent, event);
 });
 
 simplifyAgent.on(reviewCommentTrigger, async (event) => {
   if (!(await isReplyActionable(event))) return;
-  const tag = `${event.repository.full_name}#${event.pull_request.number}`;
-  console.log(
-    `[bot] dispatch simplify-apply ${tag} comment=${event.comment.id}`,
-  );
   await handleSimplifyReply(simplifyAgent, event, config);
 });
 
@@ -190,8 +180,6 @@ const dxAuditTrigger = ghReceiver.pullRequest({
 
 dxAuditAgent.on(dxAuditTrigger, async (event) => {
   if (!(await isEventActionable(event))) return;
-  const tag = `${event.repository.full_name}#${event.number}`;
-  console.log(`[bot] dispatch dx-audit ${tag} action=${event.action}`);
   await handleDxAudit(dxAuditAgent, event);
 });
 
