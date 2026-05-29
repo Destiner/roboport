@@ -71,9 +71,9 @@ async function startCheckRun(
   };
 }
 
-// The PR's current head SHA. docs-update can push a [skip ci] commit mid-run
-// that advances the head, so handlers re-resolve it to anchor a check on the
-// commit the PR now shows rather than the one the webhook fired on.
+// The PR's current head SHA. docs-update can push a commit mid-run that
+// advances the head, so handlers re-resolve it to anchor a check on the commit
+// the PR now shows rather than the one the webhook fired on.
 async function prHeadSha(
   repo: string,
   prNumber: number,
