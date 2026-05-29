@@ -1,6 +1,6 @@
 # bot
 
-Webhook-driven runner for drone agents. Receives GitHub webhooks and dispatches the `pr-review` and `docs-update` workflows in parallel per actionable PR event.
+Webhook-driven runner for drone agents. Receives GitHub webhooks and dispatches the `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows per actionable PR event, plus a reply-to-apply path on inline review-comment replies.
 
 ## Endpoints
 
@@ -26,7 +26,7 @@ Optional:
 - Build context: monorepo root
 - Dockerfile: `apps/bot/Dockerfile`
 - Volume: mount at `/data`. Seed `openai-codex-auth.json` once with a Codex grant **dedicated to the bot** — do not reuse your personal `~/.codex/auth.json`. Codex refresh tokens are single-use and rotate on every refresh, so two holders of the same `auth.json` invalidate each other (`refresh_token_reused`). Mint an isolated grant (e.g. via a separate `CODEX_HOME`) and copy it onto the volume; the bot refreshes it in place as tokens rotate.
-- Webhook: point your GitHub repo webhook at `https://<service>/webhooks/github`, content type `application/json`, with the same secret as `GITHUB_WEBHOOK_SECRET`. Subscribe to **Pull requests** only.
+- Webhook: point your GitHub repo webhook at `https://<service>/webhooks/github`, content type `application/json`, with the same secret as `GITHUB_WEBHOOK_SECRET`. Subscribe to **Pull requests** and **Pull request review comments** (the latter drives the simplify reply-to-apply path).
 
 ## Local dev
 
