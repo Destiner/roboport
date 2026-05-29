@@ -25,7 +25,7 @@ Optional:
 
 - Build context: monorepo root
 - Dockerfile: `apps/bot/Dockerfile`
-- Volume: mount at `/data`; seed `openai-codex-auth.json` once from your local `~/.codex/auth.json`. The codex model refreshes the file in place when tokens rotate.
+- Volume: mount at `/data`. Seed `openai-codex-auth.json` once with a Codex grant **dedicated to the bot** — do not reuse your personal `~/.codex/auth.json`. Codex refresh tokens are single-use and rotate on every refresh, so two holders of the same `auth.json` invalidate each other (`refresh_token_reused`). Mint an isolated grant (e.g. via a separate `CODEX_HOME`) and copy it onto the volume; the bot refreshes it in place as tokens rotate.
 - Webhook: point your GitHub repo webhook at `https://<service>/webhooks/github`, content type `application/json`, with the same secret as `GITHUB_WEBHOOK_SECRET`. Subscribe to **Pull requests** only.
 
 ## Local dev
