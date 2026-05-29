@@ -49,7 +49,7 @@ Branch: ${headRef}. Base: origin/${baseRef}.
 4. If you applied edits:
    - Run \`bun install\`, then \`bun run check\` and \`bun run typecheck\`.
    - Stage only the docs files you edited.
-   - Commit with message: \`docs: sync internal docs with PR #${number}\` followed by a blank line and \`[skip ci]\`.
+   - Commit with message: \`docs: sync internal docs with PR #${number}\`.
    - Push to origin/${headRef}.
 
 Do not amend or force-push. Do not edit source files. The GH_TOKEN env var is set and gh is authenticated; git push works via gh's credential helper.`;
@@ -72,8 +72,8 @@ async function handleDocsUpdate(
     logMessages(`docs-update:${tag}`, [...session.messages]);
     await check?.complete('neutral', 'Docs check complete', summary);
     // The agent may have pushed a docs commit, advancing the head to a commit
-    // that won't re-trigger this workflow (it carries [skip ci] and is the
-    // bot's own push), so mirror the completion onto the new head as well.
+    // that won't re-trigger this workflow (it's the bot's own push, which the
+    // actor allowlist drops), so mirror the completion onto the new head too.
     const headSha = await prHeadSha(repo, event.number);
     if (headSha !== null && headSha !== startSha) {
       const headCheck = await startCheckRun(repo, headSha, 'drone / docs');
