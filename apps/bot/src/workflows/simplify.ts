@@ -18,7 +18,6 @@ import {
   postThreadReply,
   startCheckRun,
 } from '../github';
-import { logMessages } from '../log';
 
 // Appended to every simplification idea comment so review-comment replies can be
 // routed back to this workflow. pr-review also posts bot-authored inline
@@ -104,6 +103,7 @@ async function handleSimplifyIdeas(
   event: PullRequestEvent,
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[simplify-ideas] started ${tag} action=${event.action}`);
   const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-ideas-'));
   const check = await startCheckRun(
     event.repository.full_name,
@@ -113,15 +113,15 @@ async function handleSimplifyIdeas(
   try {
     await using session = agent.session();
     await session.send(buildIdeasPrompt(event, workspace));
-    logMessages(`simplify-ideas:${tag}`, [...session.messages]);
     await check?.complete(
       'neutral',
       'Simplify scan complete',
       'Scanned the PR diff for behaviour-preserving simplifications.',
     );
+    console.log(`[simplify-ideas] finished ${tag}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bot] simplify-ideas failed for ${tag}: ${message}`);
+    console.error(`[simplify-ideas] failed ${tag}: ${message}`);
     await check?.complete('failure', 'Simplify scan failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });
@@ -136,6 +136,7 @@ async function handleSimplifyReply(
   const repo = event.repository.full_name;
   const number = event.pull_request.number;
   const tag = `${repo}#${number}`;
+  console.log(`[simplify-apply] started ${tag} comment=${event.comment.id}`);
   // in_reply_to_id is always set here — isReplyActionable gates on it.
   const rootId = event.comment.in_reply_to_id;
   if (rootId === undefined) return;
@@ -153,11 +154,11 @@ async function handleSimplifyReply(
   try {
     await using session = agent.session();
     await session.send(buildApplyPrompt(event, workspace, config));
-    logMessages(`simplify-apply:${tag}`, [...session.messages]);
     if (placeholderId !== null) await deleteReviewComment(repo, placeholderId);
+    console.log(`[simplify-apply] finished ${tag}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bot] simplify-apply failed for ${tag}: ${message}`);
+    console.error(`[simplify-apply] failed ${tag}: ${message}`);
     if (placeholderId !== null) {
       await editReviewComment(
         repo,

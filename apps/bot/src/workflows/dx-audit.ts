@@ -10,7 +10,6 @@ import type { PullRequestEvent } from 'drone/triggers';
 
 import type { Config } from '../config';
 import { startCheckRun } from '../github';
-import { logMessages } from '../log';
 
 function createDxAuditAgent(config: Config): Agent {
   return new Agent({
@@ -47,6 +46,7 @@ async function handleDxAudit(
   event: PullRequestEvent,
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[dx-audit] started ${tag} action=${event.action}`);
   const workspace = await mkdtemp(join(tmpdir(), 'drone-dx-audit-'));
   const check = await startCheckRun(
     event.repository.full_name,
@@ -56,15 +56,15 @@ async function handleDxAudit(
   try {
     await using session = agent.session();
     await session.send(buildPrompt(event, workspace));
-    logMessages(`dx-audit:${tag}`, [...session.messages]);
     await check?.complete(
       'neutral',
       'DX audit complete',
       "Audited the PR's public surface for DX/AX papercuts.",
     );
+    console.log(`[dx-audit] finished ${tag}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bot] dx-audit failed for ${tag}: ${message}`);
+    console.error(`[dx-audit] failed ${tag}: ${message}`);
     await check?.complete('failure', 'DX audit failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });

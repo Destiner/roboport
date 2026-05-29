@@ -10,7 +10,6 @@ import type { PullRequestEvent } from 'drone/triggers';
 
 import type { Config } from '../config';
 import { startCheckRun } from '../github';
-import { logMessages } from '../log';
 
 function createPrReviewAgent(config: Config): Agent {
   return new Agent({
@@ -53,6 +52,7 @@ async function handlePrReview(
   event: PullRequestEvent,
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
+  console.log(`[pr-review] started ${tag} action=${event.action}`);
   const workspace = await mkdtemp(join(tmpdir(), 'drone-pr-review-'));
   const check = await startCheckRun(
     event.repository.full_name,
@@ -62,15 +62,15 @@ async function handlePrReview(
   try {
     await using session = agent.session();
     await session.send(buildPrompt(event, workspace));
-    logMessages(`pr-review:${tag}`, [...session.messages]);
     await check?.complete(
       'neutral',
       'Review complete',
       'Posted the review verdict and any line-level findings.',
     );
+    console.log(`[pr-review] finished ${tag}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[bot] pr-review failed for ${tag}: ${message}`);
+    console.error(`[pr-review] failed ${tag}: ${message}`);
     await check?.complete('failure', 'Review failed', message);
   } finally {
     await rm(workspace, { recursive: true, force: true });
