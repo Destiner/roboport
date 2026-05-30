@@ -25,8 +25,11 @@ interface ToolRegistry {
 
 interface SearchHit {
   title: string;
-  url: string;
+  url?: string;
   pageAge?: string;
+  // Some backends synthesize an answer rather than a list of links (e.g. the
+  // codex web_search); that text lands here and the hit carries no url.
+  text?: string;
 }
 
 interface SearchOptions {

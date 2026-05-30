@@ -11,7 +11,7 @@ import { runWebFetch, runWebSearch } from './shared';
 const webSearch = new Tool({
   name: 'web_search',
   description:
-    'Search the web for current or external information beyond your knowledge. Returns results with titles and URLs.',
+    'Search the web for current or external information beyond your knowledge. Returns relevant results (each a title, usually a URL) or a synthesized answer for direct questions.',
   inputSchema: z.object({
     query: z.string().min(2).describe('The search query to use.'),
     allowed_domains: z

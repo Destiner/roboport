@@ -10,10 +10,10 @@ describe('webSearch tool', () => {
   });
 
   test('delegates to ctx.searchWeb with mapped domain filters', async () => {
-    const calls: { query: string; opts: unknown }[] = [];
+    let captured: { query: string; opts: unknown } | undefined;
     const ctx = {
       searchWeb: (query: string, opts?: unknown) => {
-        calls.push({ query, opts });
+        captured = { query, opts };
         return Promise.resolve([]);
       },
     } as unknown as ToolContext;
@@ -25,7 +25,7 @@ describe('webSearch tool', () => {
     });
     await webSearch.execute(input, ctx);
 
-    expect(calls[0]).toEqual({
+    expect(captured).toEqual({
       query: 'hello',
       opts: { allowedDomains: ['a.com'], blockedDomains: ['b.com'] },
     });

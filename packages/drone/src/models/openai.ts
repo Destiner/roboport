@@ -309,9 +309,15 @@ class OpenAIModel extends OpenAICompatibleModel {
       }
       // The codex web_search backend usually returns a synthesized answer with
       // no citation annotations, so extractSearchHits comes up empty. Surface
-      // that answer text as a single result rather than dropping it.
+      // that answer text (in the non-url `text` field) rather than dropping it.
       const answer = extractAnswerText(json);
-      return answer ? [{ title: answer, url: '' }] : [];
+      if (!answer) return [];
+      const result: SearchHit[] = [
+        { title: 'Web search answer', text: answer },
+      ];
+      return opts?.maxUses !== undefined
+        ? result.slice(0, opts.maxUses)
+        : result;
     }
 
     const response = await fetch(`${this.baseUrl}/responses`, {
