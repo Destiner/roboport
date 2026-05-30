@@ -289,7 +289,10 @@ class OpenAIModel extends OpenAICompatibleModel {
       const json = await this.fetchResponsesBuffered({
         model: this.modelName,
         stream: true,
-        tools: [{ type: 'web_search_preview' }],
+        // The codex backend rejects stored responses ("Store must be set to
+        // false"), matching the streaming turn path above.
+        store: false,
+        tools: [{ type: 'web_search' }],
         input: [
           {
             role: 'user',
@@ -301,8 +304,20 @@ class OpenAIModel extends OpenAICompatibleModel {
         instructions: 'You are a helpful assistant.',
       });
       const hits = extractSearchHits(json);
-      if (opts?.maxUses !== undefined) return hits.slice(0, opts.maxUses);
-      return hits;
+      if (hits.length > 0) {
+        return opts?.maxUses !== undefined ? hits.slice(0, opts.maxUses) : hits;
+      }
+      // The codex web_search backend usually returns a synthesized answer with
+      // no citation annotations, so extractSearchHits comes up empty. Surface
+      // that answer text (in the non-url `text` field) rather than dropping it.
+      const answer = extractAnswerText(json);
+      if (!answer) return [];
+      const result: SearchHit[] = [
+        { title: 'Web search answer', text: answer },
+      ];
+      return opts?.maxUses !== undefined
+        ? result.slice(0, opts.maxUses)
+        : result;
     }
 
     const response = await fetch(`${this.baseUrl}/responses`, {
@@ -635,6 +650,17 @@ function parseSseEvents(raw: string): ResponsesStreamEvent[] {
   }
 
   return events;
+}
+
+function extractAnswerText(json: ResponsesJson): string {
+  const parts: string[] = [];
+  for (const item of json.output ?? []) {
+    if (item.type !== 'message') continue;
+    for (const part of item.content ?? []) {
+      if (typeof part.text === 'string') parts.push(part.text);
+    }
+  }
+  return parts.join('').trim();
 }
 
 function extractSearchHits(json: ResponsesJson): SearchHit[] {

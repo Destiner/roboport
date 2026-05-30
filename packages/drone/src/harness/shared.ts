@@ -3,12 +3,52 @@ import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { Tool } from '@/core';
+import { Tool, type SearchHit, type ToolContext } from '@/core';
 
 function notImplemented(name: string): () => Promise<never> {
   return async (): Promise<never> => {
     throw new Error(`Tool "${name}" is not implemented.`);
   };
+}
+
+// Shared web-search implementation: maps the conventional tool args to the
+// model's native search (ctx.searchWeb). Each harness/app declares its own tool
+// (name, schema, description) and delegates the body here.
+function runWebSearch(
+  ctx: ToolContext,
+  args: {
+    query: string;
+    allowed_domains?: string[];
+    blocked_domains?: string[];
+  },
+): Promise<SearchHit[]> {
+  return ctx.searchWeb(args.query, {
+    allowedDomains: args.allowed_domains,
+    blockedDomains: args.blocked_domains,
+  });
+}
+
+// Shared web-fetch implementation: fetch a URL, strip markup, and run the
+// caller's prompt over the content via the model. Each harness/app declares its
+// own tool and delegates here.
+async function runWebFetch(
+  ctx: ToolContext,
+  args: { url: string; prompt: string },
+): Promise<string> {
+  const response = await fetch(args.url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${args.url}: ${response.status}`);
+  }
+  const body = await response.text();
+  const cleaned = body
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return ctx.complete(
+    `${args.prompt}\n\n---\n\nContent from ${args.url}:\n\n${cleaned}`,
+  );
 }
 
 function serializeShellResult(
@@ -315,5 +355,7 @@ export {
   notImplemented,
   readFile,
   runShell,
+  runWebFetch,
+  runWebSearch,
   serializeShellResult,
 };
