@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
-import { Tool, type SearchHit } from '@/core';
+import { Tool } from '@/core';
 
 import { Harness } from './core';
-import { applyPatchText, createToolSearch, runShell } from './shared';
+import {
+  applyPatchText,
+  createToolSearch,
+  runShell,
+  runWebSearch,
+} from './shared';
 
 const execCommand = new Tool({
   name: 'exec_command',
@@ -77,14 +82,8 @@ const webSearch = new Tool({
     blocked_domains: z.array(z.string()).optional(),
   }),
   deferred: true,
-  execute: (
-    { query, allowed_domains, blocked_domains },
-    ctx,
-  ): Promise<SearchHit[]> =>
-    ctx.searchWeb(query, {
-      allowedDomains: allowed_domains,
-      blockedDomains: blocked_domains,
-    }),
+  execute: (args, ctx): ReturnType<typeof runWebSearch> =>
+    runWebSearch(ctx, args),
 });
 
 const PLAN_STORE_KEY = 'codex.plan';

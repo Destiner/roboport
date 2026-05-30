@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { Tool, type SearchHit, type ToolContext } from '@/core';
+import { Tool, type ToolContext } from '@/core';
 
 import { Harness } from './core';
 import {
@@ -12,6 +12,8 @@ import {
   notImplemented,
   readFile,
   runShell,
+  runWebFetch,
+  runWebSearch,
 } from './shared';
 
 const bash = new Tool({
@@ -341,22 +343,8 @@ const webFetch = new Tool({
     prompt: z.string().describe('The prompt to run on the fetched content.'),
   }),
   deferred: true,
-  execute: async ({ url, prompt }, ctx): Promise<string> => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status}`);
-    }
-    const body = await response.text();
-    const cleaned = body
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return ctx.complete(
-      `${prompt}\n\n---\n\nContent from ${url}:\n\n${cleaned}`,
-    );
-  },
+  execute: (args, ctx): ReturnType<typeof runWebFetch> =>
+    runWebFetch(ctx, args),
 });
 
 const webSearch = new Tool({
@@ -375,14 +363,8 @@ const webSearch = new Tool({
       .describe('Never include search results from these domains.'),
   }),
   deferred: true,
-  execute: (
-    { query, allowed_domains, blocked_domains },
-    ctx,
-  ): Promise<SearchHit[]> =>
-    ctx.searchWeb(query, {
-      allowedDomains: allowed_domains,
-      blockedDomains: blocked_domains,
-    }),
+  execute: (args, ctx): ReturnType<typeof runWebSearch> =>
+    runWebSearch(ctx, args),
 });
 
 const agent = new Tool({
