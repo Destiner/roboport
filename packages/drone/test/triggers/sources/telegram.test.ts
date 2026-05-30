@@ -101,11 +101,44 @@ describe('TelegramReceiver.handle', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.text).toBe('/start@mybot now');
   });
+
+  test('botUsername routes @-addressed commands to this bot only', async () => {
+    const receiver = telegramTrigger({ secretToken: SECRET });
+    const events: TelegramMessage[] = [];
+    receiver
+      .message({ commands: ['start'], botUsername: 'mybot' })
+      .start((m) => events.push(m));
+
+    await receiver.handle(
+      makeRequest({
+        update_id: 1,
+        message: privateMessage({ text: '/start@otherbot' }),
+      }),
+    );
+    await receiver.handle(
+      makeRequest({
+        update_id: 2,
+        message: privateMessage({ text: '/start@MyBot' }),
+      }),
+    );
+    await receiver.handle(
+      makeRequest({
+        update_id: 3,
+        message: privateMessage({ text: '/start' }),
+      }),
+    );
+
+    expect(events.map((m) => m.text)).toEqual(['/start@MyBot', '/start']);
+  });
 });
 
 describe('splitMessage', () => {
   test('returns a single chunk under the limit', () => {
     expect(splitMessage('hello')).toEqual(['hello']);
+  });
+
+  test('throws when max is below 1', () => {
+    expect(() => splitMessage('x', 0)).toThrow('max >= 1');
   });
 
   test('splits long text into 4096-unit chunks', () => {
@@ -141,6 +174,21 @@ describe('TelegramClient', () => {
 
     expect(sent).toHaveLength(3);
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  test('refuses to auto-split formatted text over the limit', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(
+      client.sendMessage(42, 'z'.repeat(5000), { parseMode: 'HTML' }),
+    ).rejects.toThrow('parse_mode');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   test('throws when the API responds with ok: false', async () => {

@@ -99,12 +99,22 @@ class UpdateCache {
   }
 }
 
-function matchesCommand(message: TelegramMessage, commands: string[]): boolean {
+function matchesCommand(
+  message: TelegramMessage,
+  commands: string[],
+  botUsername?: string,
+): boolean {
   const text = message.text;
   if (!text || !text.startsWith('/')) return false;
-  // "/cmd@botname args" -> "cmd"
+  // "/cmd@botname args" -> name="cmd", target="botname"
   const token = text.slice(1).split(/\s/, 1)[0] ?? '';
-  const name = token.split('@', 1)[0];
+  const [name, target] = token.split('@');
+  // A command addressed to a specific bot (/cmd@bot) only matches when it
+  // targets us. Without a configured username we can't tell, so stay lenient.
+  if (target && botUsername) {
+    const normalized = botUsername.replace(/^@/, '').toLowerCase();
+    if (target.toLowerCase() !== normalized) return false;
+  }
   return commands.some(
     (command) =>
       (command.startsWith('/') ? command.slice(1) : command) === name,
@@ -127,16 +137,22 @@ class TelegramReceiver {
     );
   }
 
-  message(opts?: { commands?: string[] }): Trigger<TelegramMessage> {
+  message(opts?: {
+    commands?: string[];
+    botUsername?: string;
+  }): Trigger<TelegramMessage> {
     const bus = this.messageBus;
     const commands = opts?.commands;
+    const botUsername = opts?.botUsername;
     return {
       name: 'telegram:message',
       start: (emit) =>
         subscribe(
           bus,
           emit,
-          commands ? (m): boolean => matchesCommand(m, commands) : undefined,
+          commands
+            ? (m): boolean => matchesCommand(m, commands, botUsername)
+            : undefined,
         ),
     };
   }
@@ -186,6 +202,7 @@ class TelegramReceiver {
 // Splits text on the 4096-unit limit, preferring the last newline within the
 // window and never cutting a surrogate pair.
 function splitMessage(text: string, max = MAX_MESSAGE_LENGTH): string[] {
+  if (max < 1) throw new Error('splitMessage requires max >= 1');
   if (text.length <= max) return [text];
   const chunks: string[] = [];
   let remaining = text;
@@ -251,12 +268,19 @@ class TelegramClient {
     return this.call<boolean>('sendChatAction', { chat_id: chatId, action });
   }
 
-  // Sends text as one or more messages (split at the 4096-unit limit), in order.
+  // Sends text as one or more messages. Plain text is split at the 4096-unit
+  // limit; when parseMode is set we refuse to auto-split, since chunking could
+  // break Markdown/HTML entities — split formatted text yourself.
   async sendMessage(
     chatId: number | string,
     text: string,
     opts?: SendMessageOptions,
   ): Promise<TelegramMessage[]> {
+    if (opts?.parseMode && text.length > MAX_MESSAGE_LENGTH) {
+      throw new Error(
+        `sendMessage: text exceeds ${MAX_MESSAGE_LENGTH} chars with parse_mode ${opts.parseMode}; auto-splitting could break entities. Split it yourself.`,
+      );
+    }
     const sent: TelegramMessage[] = [];
     for (const chunk of splitMessage(text)) {
       sent.push(
