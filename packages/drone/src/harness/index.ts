@@ -1,6 +1,23 @@
 import claudeCode from './claudeCode';
 import codex from './codex';
 import pi from './pi';
-import { webFetch, webSearch } from './tools';
+import {
+  bash,
+  editFile,
+  readFile,
+  webFetch,
+  webSearch,
+  writeFile,
+} from './tools';
 
-export { claudeCode, codex, pi, webFetch, webSearch };
+export {
+  bash,
+  claudeCode,
+  codex,
+  editFile,
+  pi,
+  readFile,
+  webFetch,
+  webSearch,
+  writeFile,
+};
