@@ -143,7 +143,7 @@ const bash = new Tool({
     'Execute a shell command and return its stdout, stderr, and a non-zero exit code. Prefer the dedicated file tools over shell commands like cat, sed, or echo where they fit.',
   inputSchema: z.object({
     command: z.string().describe('The shell command to execute.'),
-    timeout_ms: z
+    timeout: z
       .number()
       .int()
       .positive()
@@ -157,10 +157,10 @@ const bash = new Tool({
         'Directory to run the command in. Defaults to the working directory.',
       ),
   }),
-  execute: ({ command, timeout_ms, workdir }, ctx): Promise<string> =>
+  execute: ({ command, timeout, workdir }, ctx): Promise<string> =>
     runShell({
       cmd: command,
-      timeout: timeout_ms,
+      timeout,
       workdir: workdir ? resolve(ctx.cwd, workdir) : ctx.cwd,
     }),
 });
