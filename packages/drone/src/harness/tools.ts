@@ -108,14 +108,18 @@ const editFile = new Tool({
     path: relativePathSchema('edit'),
     edits: z
       .array(
-        z.object({
-          old_text: z
-            .string()
-            .describe('Exact text to replace; must be unique in the file.'),
-          new_text: z
-            .string()
-            .describe('Replacement text (must differ from old_text).'),
-        }),
+        z
+          .object({
+            old_text: z
+              .string()
+              .describe('Exact text to replace; must be unique in the file.'),
+            new_text: z
+              .string()
+              .describe('Replacement text (must differ from old_text).'),
+          })
+          .refine((edit) => edit.old_text !== edit.new_text, {
+            message: 'new_text must differ from old_text.',
+          }),
       )
       .min(1)
       .describe('One or more exact-text replacements to apply.'),
@@ -139,7 +143,7 @@ const bash = new Tool({
     'Execute a shell command and return its stdout, stderr, and a non-zero exit code. Prefer the dedicated file tools over shell commands like cat, sed, or echo where they fit.',
   inputSchema: z.object({
     command: z.string().describe('The shell command to execute.'),
-    timeout: z
+    timeout_ms: z
       .number()
       .int()
       .positive()
@@ -153,10 +157,10 @@ const bash = new Tool({
         'Directory to run the command in. Defaults to the working directory.',
       ),
   }),
-  execute: ({ command, timeout, workdir }, ctx): Promise<string> =>
+  execute: ({ command, timeout_ms, workdir }, ctx): Promise<string> =>
     runShell({
       cmd: command,
-      timeout,
+      timeout: timeout_ms,
       workdir: workdir ? resolve(ctx.cwd, workdir) : ctx.cwd,
     }),
 });

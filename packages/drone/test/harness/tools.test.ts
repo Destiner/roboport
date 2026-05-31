@@ -135,6 +135,15 @@ describe('filesystem and shell tools', () => {
     expect(await Bun.file(join(workdir, 'src.txt')).text()).toBe('FOO bar qux');
   });
 
+  test('edit_file rejects a no-op replacement', (): void => {
+    expect(() =>
+      editFile.parse({
+        path: 'src.txt',
+        edits: [{ old_text: 'foo', new_text: 'foo' }],
+      }),
+    ).toThrow(/must differ/);
+  });
+
   test('bash runs the command in the working directory', async (): Promise<void> => {
     await Bun.write(join(workdir, 'marker.txt'), 'inside-workdir');
     const ctx = makeCtx();
