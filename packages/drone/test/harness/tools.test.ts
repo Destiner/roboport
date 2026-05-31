@@ -1,7 +1,17 @@
-import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { ToolContext } from '@/core';
-import { webFetch, webSearch } from '@/harness/tools';
+import {
+  bash,
+  editFile,
+  readFile,
+  webFetch,
+  webSearch,
+  writeFile,
+} from '@/harness/tools';
 
 describe('webSearch tool', () => {
   test('is a non-deferred web_search tool', () => {
@@ -70,5 +80,68 @@ describe('webFetch tool', () => {
     expect(seen).toContain('Hello world');
     expect(seen).not.toContain('ignore()');
     expect(seen).not.toContain('<b>');
+  });
+});
+
+describe('filesystem and shell tools', () => {
+  let workdir: string;
+
+  beforeEach(async (): Promise<void> => {
+    workdir = await mkdtemp(join(tmpdir(), 'drone-tools-'));
+  });
+
+  afterEach(async (): Promise<void> => {
+    await rm(workdir, { recursive: true, force: true });
+  });
+
+  function makeCtx(): ToolContext {
+    return { cwd: workdir } as unknown as ToolContext;
+  }
+
+  test('read_file resolves relative paths and uses 1-indexed offset', async (): Promise<void> => {
+    await Bun.write(join(workdir, 'note.txt'), 'a\nb\nc\nd');
+    const ctx = makeCtx();
+
+    const input = readFile.parse({ path: 'note.txt', offset: 2, limit: 2 });
+    const out = (await readFile.execute(input, ctx)) as string;
+
+    expect(out).toBe('     2\tb\n     3\tc');
+  });
+
+  test('write_file writes relative to the working directory', async (): Promise<void> => {
+    const ctx = makeCtx();
+
+    const input = writeFile.parse({ path: 'out.txt', content: 'hello' });
+    const out = (await writeFile.execute(input, ctx)) as string;
+
+    expect(out).toContain(join(workdir, 'out.txt'));
+    expect(await Bun.file(join(workdir, 'out.txt')).text()).toBe('hello');
+  });
+
+  test('edit_file applies multiple exact replacements', async (): Promise<void> => {
+    await Bun.write(join(workdir, 'src.txt'), 'foo bar baz');
+    const ctx = makeCtx();
+
+    const input = editFile.parse({
+      path: 'src.txt',
+      edits: [
+        { old_text: 'foo', new_text: 'FOO' },
+        { old_text: 'baz', new_text: 'qux' },
+      ],
+    });
+    const out = (await editFile.execute(input, ctx)) as string;
+
+    expect(out).toContain('2 replacements');
+    expect(await Bun.file(join(workdir, 'src.txt')).text()).toBe('FOO bar qux');
+  });
+
+  test('bash runs the command in the working directory', async (): Promise<void> => {
+    await Bun.write(join(workdir, 'marker.txt'), 'inside-workdir');
+    const ctx = makeCtx();
+
+    const input = bash.parse({ command: 'cat marker.txt' });
+    const out = (await bash.execute(input, ctx)) as string;
+
+    expect(out).toBe('inside-workdir');
   });
 });
