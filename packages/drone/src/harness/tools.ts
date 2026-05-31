@@ -51,16 +51,20 @@ const webFetch = new Tool({
     runWebFetch(ctx, args),
 });
 
+function relativePathSchema(action: 'read' | 'write' | 'edit'): z.ZodString {
+  return z
+    .string()
+    .describe(
+      `Path to the file to ${action}. Relative paths resolve against the working directory.`,
+    );
+}
+
 const readFile = new Tool({
   name: 'read_file',
   description:
     'Read a file from the filesystem. Returns the content with 1-indexed line numbers. Use offset and limit to read a slice of a large file.',
   inputSchema: z.object({
-    path: z
-      .string()
-      .describe(
-        'Path to the file to read. Relative paths resolve against the working directory.',
-      ),
+    path: relativePathSchema('read'),
     offset: z
       .number()
       .int()
@@ -86,11 +90,7 @@ const writeFile = new Tool({
   description:
     'Write content to a file, creating it if missing and overwriting any existing file at the path. Prefer edit_file when changing part of an existing file.',
   inputSchema: z.object({
-    path: z
-      .string()
-      .describe(
-        'Path to the file to write. Relative paths resolve against the working directory.',
-      ),
+    path: relativePathSchema('write'),
     content: z.string().describe('The full content to write to the file.'),
   }),
   execute: async ({ path, content }, ctx): Promise<string> => {
@@ -105,11 +105,7 @@ const editFile = new Tool({
   description:
     "Edit a file by replacing exact text. Each edit's old_text must match a unique, non-overlapping region of the file. Pass multiple edits to change several places in one call; every old_text is matched against the original file, not against earlier edits.",
   inputSchema: z.object({
-    path: z
-      .string()
-      .describe(
-        'Path to the file to edit. Relative paths resolve against the working directory.',
-      ),
+    path: relativePathSchema('edit'),
     edits: z
       .array(
         z.object({
