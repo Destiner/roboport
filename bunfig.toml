@@ -1,2 +1,5 @@
 [install]
 minimumReleaseAge = 259200
+# Isolated linker splits vite into peer-variants (vocs provides tsx/yaml, the app does not),
+# which duplicates waku and breaks its React context ("Missing Router" in vocs).
+linker = "hoisted"
