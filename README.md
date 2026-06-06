@@ -21,7 +21,7 @@ const incidentTriage = new Skill({
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-7', { thinking: 'medium' }),
-  prompt: 'You are an on-call triage agent. Use the ${incidentTriage.name} skill.',
+  prompt: `You are an on-call triage agent. Use the ${incidentTriage.name} skill.`,
   tools: claudeCode.tools,
   skills: [incidentTriage],
   mcp: [
