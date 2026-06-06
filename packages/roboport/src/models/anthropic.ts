@@ -13,6 +13,7 @@ import { readSse } from '@/core/stream';
 import { env } from '@/env';
 
 const ANTHROPIC_MODELS = [
+  'claude-opus-4-8',
   'claude-opus-4-7',
   'claude-opus-4-6',
   'claude-sonnet-4-6',
@@ -37,7 +38,10 @@ const ANTHROPIC_OUTPUT_BUFFER = 4_096;
 
 // Opus 4.7 and later only accept the adaptive thinking format with an effort
 // level in `output_config`. Older models keep the legacy enabled+budget shape.
-const ADAPTIVE_THINKING_MODELS = new Set<string>(['claude-opus-4-7']);
+const ADAPTIVE_THINKING_MODELS = new Set<string>([
+  'claude-opus-4-7',
+  'claude-opus-4-8',
+]);
 
 const ADAPTIVE_EFFORTS: Record<
   Exclude<ThinkingLevel, 'off'>,
