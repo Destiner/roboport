@@ -47,14 +47,6 @@ await agent.start();
 Bun.serve({ port: 8080, fetch: (req) => grafana.handle(req) });
 ```
 
-## Scripts
-
-```sh
-bun install
-bun run check
-bun run typecheck
-```
-
 ## Sessions
 
 `agent.session()` returns a `Session` you can stream from and reuse across turns.
