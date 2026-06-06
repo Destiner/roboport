@@ -41,7 +41,7 @@ const ANTHROPIC_OUTPUT_BUFFER = 4_096;
 const ADAPTIVE_THINKING_MODELS = new Set<string>([
   'claude-opus-4-7',
   'claude-opus-4-8',
-]);
+] satisfies (typeof ANTHROPIC_MODELS)[number][]);
 
 const ADAPTIVE_EFFORTS: Record<
   Exclude<ThinkingLevel, 'off'>,
