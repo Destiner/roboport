@@ -69,6 +69,66 @@ await resumed.send('Continue from here.');
 
 Sessions hold MCP connections for their lifetime, so close them when done (or use `await using`).
 
+## Skills
+
+```ts
+import { Skill } from 'roboport';
+import { prReview, docsUpdate } from 'roboport/skills';
+
+const releaseNotes = new Skill({
+  name: 'release-notes',
+  description: 'Draft release notes from merged PRs.',
+  content: '# Release notes\n\n...',
+});
+
+const agent = new Agent({
+  skills: [docsUpdate, releaseNotes],
+});
+```
+
+Skills are lazy-loaded by the model.
+
+## MCP
+
+```ts
+import { Grafana, Linear } from 'roboport/mcp';
+
+const agent = new Agent({
+  mcp: [
+    new Grafana({
+      url: process.env.GRAFANA_URL,
+      serviceAccountToken: process.env.GRAFANA_TOKEN,
+    }),
+    new Linear({ apiKey: process.env.LINEAR_API_KEY }),
+  ],
+});
+```
+
+MCP tools are deferred by default and surfaced via `ToolSearch`.
+
+## Triggers
+
+A trigger is an event source. The handler decides whether to start the agent.
+
+```ts
+import { cron, githubTrigger } from 'roboport/triggers';
+
+// Time-based, fires in-process
+agent.on(cron({ schedule: { every: 'day', at: { hour: 9 } } }), async () => {
+  await using session = agent.session();
+  await session.send('Post the daily standup summary.');
+});
+
+// Webhook-based
+const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+agent.on(github.pullRequest({ actions: ['opened'] }), async (event) => {
+  await using session = agent.session();
+  await session.send(`Review PR #${event.number}.`);
+});
+
+await agent.start();
+```
+
 ## Status
 
 Early. Experimental. APIs will change.
