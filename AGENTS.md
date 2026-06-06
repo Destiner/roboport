@@ -40,7 +40,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 - Agents and sessions can set `cwd` to scope a run to a workspace; built-in harness shell/search tools default to `ToolContext.cwd` (`packages/roboport/src/core/agent.ts`, `packages/roboport/src/core/tool.ts`).
 - Trigger handlers registered with `Agent.on` receive the event and call `agent.session().send(...)` when they want to run the agent (`packages/roboport/src/core/agent.ts`).
 - The root `roboport` export re-exports core primitives and message/session/tool registry types from `packages/roboport/src/core/` (`packages/roboport/src/index.ts`).
-- Every `Model` adapter extends the abstract class in `packages/roboport/src/core/model.ts`, implements `streamMessage(...)`, and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 uses adaptive thinking instead of budget tokens.
+- Every `Model` adapter extends the abstract class in `packages/roboport/src/core/model.ts`, implements `streamMessage(...)`, and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 and later use adaptive thinking instead of budget tokens.
 
 ## Conventions
 
