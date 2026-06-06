@@ -7,44 +7,32 @@ Minimal framework for building agents.
 Composable primitives with sane defaults. Bring your own models, tools, skills; or just use the built-ins.
 
 ```ts
-import { Agent, Skill } from 'roboport';
+import { Agent } from 'roboport';
 import { claudeCode } from 'roboport/harness';
-import { Grafana, Linear } from 'roboport/mcp';
 import { AnthropicModel } from 'roboport/models';
-import { grafanaTrigger } from 'roboport/triggers';
-
-const incidentTriage = new Skill({
-  name: 'incident-triage',
-  description: 'Investigate an ongoing incident.',
-  content: '...',
-});
+import { prReview } from 'roboport/skills';
+import { githubTrigger } from 'roboport/triggers';
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-7', { thinking: 'medium' }),
-  prompt: `You are an on-call triage agent. Use the ${incidentTriage.name} skill.`,
+  model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
+  prompt: `You are a code review agent. Apply the ${prReview.name} skill.`,
   tools: claudeCode.tools,
-  skills: [incidentTriage],
-  mcp: [
-    new Grafana({
-      url: process.env.GRAFANA_URL,
-      serviceAccountToken: process.env.GRAFANA_TOKEN,
-    }),
-    new Linear({ apiKey: process.env.LINEAR_API_KEY }),
-  ],
+  skills: [prReview],
 });
 
-const grafana = grafanaTrigger();
-agent.on(grafana.alert({ status: 'firing' }), async (alert) => {
-  await using session = agent.session();
-  await session.send(
-    `Triage alert "${alert.labels.alertname}" and file a Linear ticket.`,
-  );
-});
+const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+agent.on(
+  github.pullRequest({ actions: ['opened', 'synchronize'] }),
+  async (event) => {
+    await using session = agent.session();
+    await session.send(
+      `Review PR #${event.number} in ${event.repository.full_name}. ` +
+        `Post the verdict and any line-level findings to GitHub.`,
+    );
+  },
+);
 
 await agent.start();
-
-// Mount the Grafana receiver on your HTTP server of choice
-Bun.serve({ port: 8080, fetch: (req) => grafana.handle(req) });
 ```
 
 ## Sessions
