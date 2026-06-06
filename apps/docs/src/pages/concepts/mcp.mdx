@@ -1,0 +1,17 @@
+# MCP
+
+```ts
+import { Grafana, Linear } from 'roboport/mcp';
+
+const agent = new Agent({
+  mcp: [
+    new Grafana({
+      url: process.env.GRAFANA_URL,
+      serviceAccountToken: process.env.GRAFANA_TOKEN,
+    }),
+    new Linear({ apiKey: process.env.LINEAR_API_KEY }),
+  ],
+});
+```
+
+MCP tools are deferred by default and surfaced via `ToolSearch`.

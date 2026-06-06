@@ -1,0 +1,22 @@
+# Triggers
+
+A trigger is an event source. The handler decides whether to start the agent.
+
+```ts
+import { cron, githubTrigger } from 'roboport/triggers';
+
+// Time-based, fires in-process
+agent.on(cron({ schedule: { every: 'day', at: { hour: 9 } } }), async () => {
+  await using session = agent.session();
+  await session.send('Post the daily standup summary.');
+});
+
+// Webhook-based
+const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+agent.on(github.pullRequest({ actions: ['opened'] }), async (event) => {
+  await using session = agent.session();
+  await session.send(`Review PR #${event.number}.`);
+});
+
+await agent.start();
+```
