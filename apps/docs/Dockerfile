@@ -6,11 +6,11 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml tsconfig.json ./
 COPY apps/bot/package.json ./apps/bot/
 COPY apps/docs/package.json ./apps/docs/
-COPY packages/drone/package.json ./packages/drone/
+COPY packages/roboport/package.json ./packages/roboport/
 
-RUN bun install --frozen-lockfile --filter '@drone/docs'
+RUN bun install --frozen-lockfile --filter '@roboport/docs'
 
-COPY packages/drone ./packages/drone
+COPY packages/roboport ./packages/roboport
 COPY apps/docs ./apps/docs
 
 RUN cd apps/docs && bun run build

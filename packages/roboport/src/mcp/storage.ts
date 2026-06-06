@@ -16,7 +16,7 @@ interface OAuthStorage {
   clear(key: string): Promise<void>;
 }
 
-const DEFAULT_PATH = join(homedir(), '.drone', 'mcp-auth.json');
+const DEFAULT_PATH = join(homedir(), '.roboport', 'mcp-auth.json');
 
 class FileStorage implements OAuthStorage {
   private path: string;

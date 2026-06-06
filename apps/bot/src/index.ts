@@ -1,9 +1,9 @@
+import { Hono } from 'hono';
 import {
   githubTrigger,
   type PullRequestEvent,
   type PullRequestReviewCommentEvent,
-} from 'drone/triggers';
-import { Hono } from 'hono';
+} from 'roboport/triggers';
 
 import { loadConfig } from './config';
 import { GithubApp } from './github-app';

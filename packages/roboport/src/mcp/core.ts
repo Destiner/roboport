@@ -322,7 +322,7 @@ class Mcp implements McpClient {
     await connection.request('initialize', {
       protocolVersion: PROTOCOL_VERSION,
       capabilities: {},
-      clientInfo: { name: 'drone', version: '0.1.0' },
+      clientInfo: { name: 'roboport', version: '0.1.0' },
     });
     await connection.notify('notifications/initialized');
 

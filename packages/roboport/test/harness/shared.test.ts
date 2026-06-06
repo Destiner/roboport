@@ -19,7 +19,7 @@ import {
 let workdir: string;
 
 beforeEach(async (): Promise<void> => {
-  workdir = await mkdtemp(join(tmpdir(), 'drone-shared-'));
+  workdir = await mkdtemp(join(tmpdir(), 'roboport-shared-'));
 });
 
 afterEach(async (): Promise<void> => {
@@ -113,10 +113,10 @@ describe('applyExactReplacements', () => {
     const filePath = join(workdir, 'src.txt');
     await Bun.write(filePath, 'hello world');
     const count = await applyExactReplacements(filePath, [
-      { oldString: 'world', newString: 'drone' },
+      { oldString: 'world', newString: 'roboport' },
     ]);
     expect(count).toBe(1);
-    expect(await Bun.file(filePath).text()).toBe('hello drone');
+    expect(await Bun.file(filePath).text()).toBe('hello roboport');
   });
 
   test('replaces multiple non-overlapping ranges', async (): Promise<void> => {
@@ -135,7 +135,7 @@ describe('applyExactReplacements', () => {
     await Bun.write(filePath, 'hello');
     await expect(
       applyExactReplacements(filePath, [
-        { oldString: 'world', newString: 'drone' },
+        { oldString: 'world', newString: 'roboport' },
       ]),
     ).rejects.toThrow(/String not found/);
   });

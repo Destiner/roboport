@@ -74,7 +74,7 @@ class Agent {
             const message =
               error instanceof Error ? error.message : String(error);
             console.error(
-              `[drone] trigger "${trigger.name}" handler failed: ${message}`,
+              `[roboport] trigger "${trigger.name}" handler failed: ${message}`,
             );
           });
       });

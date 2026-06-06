@@ -1,6 +1,6 @@
 # bot
 
-Webhook-driven runner for drone agents. Receives GitHub webhooks and dispatches the `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows per actionable PR event, plus a reply-to-apply path on inline review-comment replies.
+Webhook-driven runner for roboport agents. Receives GitHub webhooks and dispatches the `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows per actionable PR event, plus a reply-to-apply path on inline review-comment replies.
 
 ## Endpoints
 
@@ -19,14 +19,14 @@ Required:
 - `GITHUB_APP_ID` — the app's numeric App ID
 - `GITHUB_APP_PRIVATE_KEY` — the app private key PEM (raw, `\n`-escaped, or base64-encoded)
 - `GITHUB_WEBHOOK_SECRET` — same secret configured on the app webhook
-- `DRONE_ALLOWED_ACTORS` — comma-separated GitHub logins permitted to trigger workflows
+- `ROBOPORT_ALLOWED_ACTORS` — comma-separated GitHub logins permitted to trigger workflows
 
 App permissions: **Contents: Read & write**, **Pull requests: Read & write**,
 and **Checks: Read & write** (plus the mandatory **Metadata: Read-only**).
 Webhook events: **Pull request** and **Pull request review comment**.
 
-The bot opens a check run per workflow (`drone / pr-review`, `drone / docs`,
-`drone / simplify`, `drone / dx-audit`) on the PR head commit so its progress
+The bot opens a check run per workflow (`roboport / pr-review`, `roboport / docs`,
+`roboport / simplify`, `roboport / dx-audit`) on the PR head commit so its progress
 shows in the PR UI. These are advisory — they conclude `neutral`, never gating
 a merge; do not add them to branch protection's required checks.
 
@@ -41,9 +41,9 @@ ever comments.)
 Optional:
 
 - `GITHUB_APP_INSTALLATION_ID` — required only if the app is installed in more than one place; otherwise auto-discovered
-- `DRONE_GIT_USER_NAME`, `DRONE_GIT_USER_EMAIL` — override the commit author; default to the app's bot identity so commits link to the app
+- `ROBOPORT_GIT_USER_NAME`, `ROBOPORT_GIT_USER_EMAIL` — override the commit author; default to the app's bot identity so commits link to the app
 - `PORT` (default `3000`)
-- `DRONE_OPENAI_CODEX_AUTH_FILE` (default `/data/openai-codex-auth.json`) — codex auth/refresh-token store
+- `ROBOPORT_OPENAI_CODEX_AUTH_FILE` (default `/data/openai-codex-auth.json`) — codex auth/refresh-token store
 
 ## Deployment (Railway)
 

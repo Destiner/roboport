@@ -572,7 +572,7 @@ class OpenAIModel extends OpenAICompatibleModel {
       const headers: Record<string, string> = {
         authorization: auth.authorization,
         'chatgpt-account-id': auth.accountId,
-        originator: 'drone',
+        originator: 'roboport',
         'openai-beta': 'responses=experimental',
         accept: 'application/json',
         'content-type': 'application/json',

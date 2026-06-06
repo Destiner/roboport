@@ -2,14 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Agent } from 'drone';
-import { codex } from 'drone/harness';
-import { OpenAIModel } from 'drone/models';
-import { codeSimplifier } from 'drone/skills';
+import { Agent } from 'roboport';
+import { codex } from 'roboport/harness';
+import { OpenAIModel } from 'roboport/models';
+import { codeSimplifier } from 'roboport/skills';
 import type {
   PullRequestEvent,
   PullRequestReviewCommentEvent,
-} from 'drone/triggers';
+} from 'roboport/triggers';
 
 import type { Config } from '../config';
 import {
@@ -22,7 +22,7 @@ import {
 // Appended to every simplification idea comment so review-comment replies can be
 // routed back to this workflow. pr-review also posts bot-authored inline
 // comments, so the reply gate matches on this marker, not just authorship.
-const SIMPLIFY_IDEA_MARKER = '<!-- drone-simplify-idea -->';
+const SIMPLIFY_IDEA_MARKER = '<!-- roboport-simplify-idea -->';
 
 function createSimplifyAgent(config: Config): Agent {
   return new Agent({
@@ -104,11 +104,11 @@ async function handleSimplifyIdeas(
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
   console.log(`[simplify-ideas] started ${tag} action=${event.action}`);
-  const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-ideas-'));
+  const workspace = await mkdtemp(join(tmpdir(), 'roboport-simplify-ideas-'));
   const check = await startCheckRun(
     event.repository.full_name,
     event.pull_request.head.sha,
-    'drone / simplify',
+    'roboport / simplify',
   );
   try {
     await using session = agent.session();
@@ -140,7 +140,7 @@ async function handleSimplifyReply(
   // in_reply_to_id is always set here — isReplyActionable gates on it.
   const rootId = event.comment.in_reply_to_id;
   if (rootId === undefined) return;
-  const workspace = await mkdtemp(join(tmpdir(), 'drone-simplify-apply-'));
+  const workspace = await mkdtemp(join(tmpdir(), 'roboport-simplify-apply-'));
   // No head-sha check run fits the reply path (it commits back to the branch),
   // so acknowledge progress with a placeholder reply in the thread. The agent
   // posts the real outcome (a commit link, an answer, or nothing), so on

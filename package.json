@@ -1,5 +1,5 @@
 {
-  "name": "drone-monorepo",
+  "name": "roboport-monorepo",
   "private": true,
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
@@ -9,7 +9,7 @@
     "check:eslint": "bun --filter '*' check:eslint",
     "test": "bun --filter '*' test",
     "typecheck": "bun --filter '*' typecheck",
-    "docs": "bun --filter @drone/docs dev"
+    "docs": "bun --filter @roboport/docs dev"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

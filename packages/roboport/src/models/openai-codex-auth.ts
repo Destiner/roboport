@@ -48,7 +48,7 @@ function defaultAuthFiles(): string[] {
   const codexHome = env.codexHome;
   if (codexHome) files.push(join(expandPath(codexHome), 'auth.json'));
   files.push(join(homedir(), '.codex', 'auth.json'));
-  files.push(join(homedir(), '.drone', 'openai-codex-auth.json'));
+  files.push(join(homedir(), '.roboport', 'openai-codex-auth.json'));
   return files;
 }
 

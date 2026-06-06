@@ -1,5 +1,5 @@
-// Single source of truth for env vars read by drone.
-// Reads are lazy: drone is a library, so importing it must never throw
+// Single source of truth for env vars read by roboport.
+// Reads are lazy: roboport is a library, so importing it must never throw
 // because of unset vars. Each model still accepts an explicit override
 // and falls back to the matching getter here.
 
@@ -23,7 +23,7 @@ export const env = {
     return read('OPENAI_API_KEY');
   },
   get openaiCodexAuthFile() {
-    return read('DRONE_OPENAI_CODEX_AUTH_FILE');
+    return read('ROBOPORT_OPENAI_CODEX_AUTH_FILE');
   },
   get codexHome() {
     return read('CODEX_HOME');

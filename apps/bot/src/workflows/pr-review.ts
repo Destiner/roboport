@@ -2,11 +2,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Agent } from 'drone';
-import { codex } from 'drone/harness';
-import { OpenAIModel } from 'drone/models';
-import { prReview } from 'drone/skills';
-import type { PullRequestEvent } from 'drone/triggers';
+import { Agent } from 'roboport';
+import { codex } from 'roboport/harness';
+import { OpenAIModel } from 'roboport/models';
+import { prReview } from 'roboport/skills';
+import type { PullRequestEvent } from 'roboport/triggers';
 
 import type { Config } from '../config';
 import { startCheckRun } from '../github';
@@ -53,11 +53,11 @@ async function handlePrReview(
 ): Promise<void> {
   const tag = `${event.repository.full_name}#${event.number}`;
   console.log(`[pr-review] started ${tag} action=${event.action}`);
-  const workspace = await mkdtemp(join(tmpdir(), 'drone-pr-review-'));
+  const workspace = await mkdtemp(join(tmpdir(), 'roboport-pr-review-'));
   const check = await startCheckRun(
     event.repository.full_name,
     event.pull_request.head.sha,
-    'drone / pr-review',
+    'roboport / pr-review',
   );
   try {
     await using session = agent.session();

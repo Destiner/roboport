@@ -44,7 +44,7 @@ describe('FileStorage', () => {
   let filePath: string;
 
   beforeEach(async (): Promise<void> => {
-    workdir = await mkdtemp(join(tmpdir(), 'drone-storage-'));
+    workdir = await mkdtemp(join(tmpdir(), 'roboport-storage-'));
     filePath = join(workdir, 'nested', 'mcp-auth.json');
   });
 

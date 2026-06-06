@@ -1,6 +1,6 @@
 import { defineConfig } from 'vocs/config';
 
 export default defineConfig({
-  title: 'Drone',
+  title: 'Roboport',
   description: 'Agents as Code',
 });
