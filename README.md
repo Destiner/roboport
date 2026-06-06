@@ -82,6 +82,7 @@ const releaseNotes = new Skill({
 });
 
 const agent = new Agent({
+  // …
   skills: [docsUpdate, releaseNotes],
 });
 ```
@@ -94,6 +95,7 @@ Skills are lazy-loaded by the model.
 import { Grafana, Linear } from 'roboport/mcp';
 
 const agent = new Agent({
+  // …
   mcp: [
     new Grafana({
       url: process.env.GRAFANA_URL,
