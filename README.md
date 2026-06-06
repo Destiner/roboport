@@ -2,9 +2,16 @@
 
 > Agents as Code
 
-Minimal framework for building agents.
+A minimal framework for building agents.
 
 Composable primitives with sane defaults. Bring your own models, tools, skills; or just use the built-ins.
+
+- **Minimal**: zero dependencies, small core
+- **High level**: no tool approvals, no steering
+- **Modular**: swap out built-in components or implement custom ones
+- **Batteries included** — harness presets, a built-in skill bundle, and MCP client support
+
+## Example
 
 ```ts
 import { Agent } from 'roboport';
