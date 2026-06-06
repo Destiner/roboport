@@ -53,8 +53,6 @@ for await (const event of session.send('Summarise the branch.')) {
 const messages = await session.send('Now write a PR description.');
 ```
 
-Event types include `text-delta`, `text`, `thinking-delta`, `thinking`, `tool-call`, `tool-result`, `message-start`, `message-end`, `turn-end`, and `error`. Token-level deltas stream as the model emits them; matching completion events fire once each block is fully assembled.
-
 Resume a prior conversation by passing its message history:
 
 ```ts
@@ -63,16 +61,6 @@ await resumed.send('Continue from here.');
 ```
 
 Sessions hold MCP connections for their lifetime, so close them when done (or use `await using`).
-
-## Model thinking
-
-Model adapters that support reasoning can opt in with a shared `thinking` option:
-
-```ts
-new AnthropicModel('claude-sonnet-4-6', { thinking: 'low' });
-```
-
-Levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Provider adapters map supported levels to their wire formats; unsupported levels may be collapsed, ignored, or rejected by the provider. When a provider returns reasoning content, assistant messages include `thinking` parts alongside text and tool calls.
 
 ## Status
 
