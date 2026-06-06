@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["src/**/*", "../../packages/drone/src/**/*.d.ts"]
+  "include": ["src/**/*", "../../packages/roboport/src/**/*.d.ts"]
 }

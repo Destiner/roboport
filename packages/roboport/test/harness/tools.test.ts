@@ -87,7 +87,7 @@ describe('filesystem and shell tools', () => {
   let workdir: string;
 
   beforeEach(async (): Promise<void> => {
-    workdir = await mkdtemp(join(tmpdir(), 'drone-tools-'));
+    workdir = await mkdtemp(join(tmpdir(), 'roboport-tools-'));
   });
 
   afterEach(async (): Promise<void> => {

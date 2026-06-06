@@ -8,7 +8,7 @@ import { createSign } from 'node:crypto';
 // expiry.
 
 const API = 'https://api.github.com';
-const USER_AGENT = 'drone-bot';
+const USER_AGENT = 'roboport-bot';
 // Refresh when fewer than this many ms remain on the cached token.
 const EXPIRY_BUFFER_MS = 10 * 60 * 1000;
 

@@ -25,14 +25,14 @@ function loadConfig(): Config {
   return {
     port: Number(readOptional('PORT', '3000')),
     webhookSecret: readEnv('GITHUB_WEBHOOK_SECRET'),
-    allowedActors: readEnv('DRONE_ALLOWED_ACTORS')
+    allowedActors: readEnv('ROBOPORT_ALLOWED_ACTORS')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    gitUserName: readOptional('DRONE_GIT_USER_NAME', ''),
-    gitUserEmail: readOptional('DRONE_GIT_USER_EMAIL', ''),
+    gitUserName: readOptional('ROBOPORT_GIT_USER_NAME', ''),
+    gitUserEmail: readOptional('ROBOPORT_GIT_USER_EMAIL', ''),
     codexAuthFile: readOptional(
-      'DRONE_OPENAI_CODEX_AUTH_FILE',
+      'ROBOPORT_OPENAI_CODEX_AUTH_FILE',
       '/data/openai-codex-auth.json',
     ),
     app: {
