@@ -15,13 +15,13 @@ import { grafanaTrigger } from 'roboport/triggers';
 
 const incidentTriage = new Skill({
   name: 'incident-triage',
-  description: 'Investigate a Grafana alert and open a Linear triage ticket.',
-  content: '...', // playbook lives here
+  description: 'Investigate an ongoing incident.',
+  content: '...',
 });
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-7', { thinking: 'low' }),
-  prompt: 'You are an on-call triage agent.',
+  model: new AnthropicModel('claude-opus-4-7', { thinking: 'medium' }),
+  prompt: 'You are an on-call triage agent. Use the ${incidentTriage.name} skill.',
   tools: claudeCode.tools,
   skills: [incidentTriage],
   mcp: [
@@ -37,7 +37,7 @@ const grafana = grafanaTrigger();
 agent.on(grafana.alert({ status: 'firing' }), async (alert) => {
   await using session = agent.session();
   await session.send(
-    `Triage alert "${alert.labels.alertname}" and file a Linear ticket. Use the ${incidentTriage.name} skill.`,
+    `Triage alert "${alert.labels.alertname}" and file a Linear ticket.`,
   );
 });
 
