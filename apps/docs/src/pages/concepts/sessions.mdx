@@ -1,0 +1,26 @@
+# Sessions
+
+`agent.session()` returns a `Session` you can stream from and reuse across turns.
+
+```ts
+await using session = agent.session();
+
+// Stream events as they arrive
+for await (const event of session.send('Summarise the branch.')) {
+  if (event.type === 'text-delta') process.stdout.write(event.text);
+  if (event.type === 'tool-call') console.log(`→ ${event.toolName}`);
+  if (event.type === 'tool-result') console.log(`← ${event.toolName}`);
+}
+
+// Or await the turn for the post-turn message history
+const messages = await session.send('Now write a PR description.');
+```
+
+Resume a prior conversation by passing its message history:
+
+```ts
+const resumed = agent.session({ messages: savedMessages });
+await resumed.send('Continue from here.');
+```
+
+Sessions hold MCP connections for their lifetime, so close them when done (or use `await using`).

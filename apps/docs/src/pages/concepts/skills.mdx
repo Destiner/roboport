@@ -1,0 +1,19 @@
+# Skills
+
+```ts
+import { Skill } from 'roboport';
+import { prReview, docsUpdate } from 'roboport/skills';
+
+const releaseNotes = new Skill({
+  name: 'release-notes',
+  description: 'Draft release notes from merged PRs.',
+  content: '# Release notes\n\n...',
+});
+
+const agent = new Agent({
+  // …
+  skills: [docsUpdate, releaseNotes],
+});
+```
+
+Skills are lazy-loaded by the model.
