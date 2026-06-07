@@ -22,7 +22,7 @@ import { githubTrigger } from 'roboport/triggers';
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
-  prompt: `You are a code review agent. Apply the ${prReview.name} skill.`,
+  prompt: claudeCode.system,
   tools: claudeCode.tools,
   skills: [prReview],
 });
