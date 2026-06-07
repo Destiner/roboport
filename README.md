@@ -131,6 +131,12 @@ agent.on(github.pullRequest({ actions: ['opened'] }), async (event) => {
 await agent.start();
 ```
 
+A webhook trigger needs a URL to receive events. Bind the receiver's `handle` to a route:
+
+```ts
+app.post('/webhooks/github', (c) => github.handle(c.req.raw));
+```
+
 ## Status
 
 Early. Experimental. APIs will change.
