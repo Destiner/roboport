@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z4 from 'zod/v4/core';
 
 import type { Message, TextPart, ThinkingPart, ToolCallPart } from './message';
 
@@ -63,11 +63,18 @@ interface ToolContext {
   cwd: string;
 }
 
-type ZodToolInit<TSchema extends z.ZodTypeAny, TResult> = {
+// Schemas are consumed through `zod/v4/core` rather than the full `zod`
+// entrypoint so the framework stays decoupled from the builder API: any Zod 4
+// schema (Classic or Mini) the consumer brings via their own zod peer satisfies
+// `$ZodType`.
+type ZodToolInit<TSchema extends z4.$ZodType, TResult> = {
   name: string;
   description: string;
   inputSchema: TSchema;
-  execute: (input: z.infer<TSchema>, ctx: ToolContext) => MaybePromise<TResult>;
+  execute: (
+    input: z4.output<TSchema>,
+    ctx: ToolContext,
+  ) => MaybePromise<TResult>;
   deferred?: boolean;
 };
 
@@ -79,11 +86,26 @@ type RawToolInit<TResult> = {
   deferred?: boolean;
 };
 
-type ToolInit<TSchema extends z.ZodTypeAny, TResult> =
+type ToolInit<TSchema extends z4.$ZodType, TResult> =
   | ZodToolInit<TSchema, TResult>
   | RawToolInit<TResult>;
 
-class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
+// Classic Zod schemas expose a `.parse` method that throws the public
+// `ZodError`; Zod Mini schemas do not. Detecting it lets `Tool.parse` preserve
+// each schema flavour's native error type instead of always surfacing the
+// lower-level core `$ZodError`.
+function hasParseMethod(
+  schema: unknown,
+): schema is { parse: (input: unknown) => unknown } {
+  return (
+    typeof schema === 'object' &&
+    schema !== null &&
+    'parse' in schema &&
+    typeof (schema as { parse: unknown }).parse === 'function'
+  );
+}
+
+class Tool<TSchema extends z4.$ZodType = z4.$ZodType, TResult = unknown> {
   name: string;
   description: string;
   inputSchema?: TSchema;
@@ -116,12 +138,17 @@ class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
         `Tool "${this.name}" has neither inputSchema nor jsonSchema.`,
       );
     }
-    return z.toJSONSchema(this.inputSchema) as object;
+    return z4.toJSONSchema(this.inputSchema) as object;
   }
 
   parse(input: unknown): unknown {
-    if (this.inputSchema) return this.inputSchema.parse(input);
-    return input;
+    const schema = this.inputSchema;
+    if (!schema) return input;
+    // Route classic schemas through their own `.parse` so the thrown error
+    // type matches what consumers caught before this refactor; Mini schemas
+    // fall back to the shared core parser.
+    if (hasParseMethod(schema)) return schema.parse(input);
+    return z4.parse(schema, input);
   }
 }
 

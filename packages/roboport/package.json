@@ -27,10 +27,11 @@
     "build:manifest": "bun scripts/build-manifest.ts",
     "dist:pack": "bun run build && cd dist && bun pm pack --destination .."
   },
-  "dependencies": {
-    "zod": "^4.4.3"
+  "peerDependencies": {
+    "zod": "^4.0.0"
   },
   "devDependencies": {
-    "tsc-alias": "^1.8.17"
+    "tsc-alias": "^1.8.17",
+    "zod": "^4.4.3"
   }
 }

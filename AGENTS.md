@@ -36,6 +36,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 ## Patterns
 
 - Tools accept either a Zod `inputSchema` or a raw `jsonSchema`; the `Tool` constructor has overloads for both (`packages/roboport/src/core/tool.ts`).
+- `roboport` keeps Zod as a peer dependency, so workspace consumers that define Zod-backed tools list `zod` in their own dependencies (`packages/roboport/package.json`).
 - Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `packages/roboport/src/core/tool.ts`.
 - Agents and sessions can set `cwd` to scope a run to a workspace; built-in harness shell/search tools default to `ToolContext.cwd` (`packages/roboport/src/core/agent.ts`, `packages/roboport/src/core/tool.ts`).
 - Trigger handlers registered with `Agent.on` receive the event and call `agent.session().send(...)` when they want to run the agent (`packages/roboport/src/core/agent.ts`).

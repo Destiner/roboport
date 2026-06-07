@@ -19,7 +19,9 @@ for (const sp of subpaths) {
   };
 }
 
-const distManifest = {
+const source = pkg as Record<string, unknown>;
+
+const distManifest: Record<string, unknown> = {
   name: pkg.name,
   version: pkg.version,
   author: pkg.author,
@@ -28,8 +30,15 @@ const distManifest = {
   main: './index.js',
   types: './index.d.ts',
   exports: exportsField,
-  dependencies: pkg.dependencies,
 };
+
+// Mirror the dependency contract onto the packed manifest. zod is a peer
+// dependency, so without copying `peerDependencies` the published package
+// would declare nothing and consumers would only discover the missing peer as
+// a runtime module-resolution failure.
+for (const field of ['dependencies', 'peerDependencies'] as const) {
+  if (source[field]) distManifest[field] = source[field];
+}
 
 await writeFile(
   resolve(distDir, 'package.json'),
