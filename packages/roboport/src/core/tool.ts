@@ -90,6 +90,21 @@ type ToolInit<TSchema extends z4.$ZodType, TResult> =
   | ZodToolInit<TSchema, TResult>
   | RawToolInit<TResult>;
 
+// Classic Zod schemas expose a `.parse` method that throws the public
+// `ZodError`; Zod Mini schemas do not. Detecting it lets `Tool.parse` preserve
+// each schema flavour's native error type instead of always surfacing the
+// lower-level core `$ZodError`.
+function hasParseMethod(
+  schema: unknown,
+): schema is { parse: (input: unknown) => unknown } {
+  return (
+    typeof schema === 'object' &&
+    schema !== null &&
+    'parse' in schema &&
+    typeof (schema as { parse: unknown }).parse === 'function'
+  );
+}
+
 class Tool<TSchema extends z4.$ZodType = z4.$ZodType, TResult = unknown> {
   name: string;
   description: string;
@@ -127,8 +142,13 @@ class Tool<TSchema extends z4.$ZodType = z4.$ZodType, TResult = unknown> {
   }
 
   parse(input: unknown): unknown {
-    if (this.inputSchema) return z4.parse(this.inputSchema, input);
-    return input;
+    const schema = this.inputSchema;
+    if (!schema) return input;
+    // Route classic schemas through their own `.parse` so the thrown error
+    // type matches what consumers caught before this refactor; Mini schemas
+    // fall back to the shared core parser.
+    if (hasParseMethod(schema)) return schema.parse(input);
+    return z4.parse(schema, input);
   }
 }
 
