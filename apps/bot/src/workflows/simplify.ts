@@ -30,7 +30,7 @@ function createSimplifyAgent(config: Config): Agent {
       auth: { type: 'codex', authFile: config.codexAuthFile },
       thinking: 'medium',
     }),
-    prompt: codex.system,
+    system: codex.system,
     tools: codex.tools,
     skills: [codeSimplifier],
   });

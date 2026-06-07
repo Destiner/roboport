@@ -30,7 +30,7 @@ interface Registration<T = unknown> {
 
 class Agent {
   model: Model;
-  prompt: string;
+  system: string;
   tools: Tool[];
   skills: Skill[];
   mcp: McpClient[];
@@ -40,21 +40,21 @@ class Agent {
 
   constructor({
     model,
-    prompt,
+    system,
     tools,
     skills,
     mcp,
     cwd,
   }: {
     model: Model;
-    prompt: string;
+    system: string;
     tools: Tool[];
     skills: Skill[];
     mcp?: McpClient[];
     cwd?: string;
   }) {
     this.model = model;
-    this.prompt = prompt;
+    this.system = system;
     this.tools = tools;
     this.skills = skills;
     this.mcp = mcp ?? [];
@@ -89,7 +89,7 @@ class Agent {
   }
 
   buildSystem(allTools: Tool[]): string {
-    let system = this.prompt;
+    let system = this.system;
     if (this.skills.length > 0) {
       const skillsList = this.skills
         .map((skill) => `- ${skill.name}: ${skill.description}`)

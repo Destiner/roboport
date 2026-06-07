@@ -7,7 +7,7 @@ import { logEvents, logMessages } from './common';
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-7'),
-  prompt: claudeCode.system,
+  system: claudeCode.system,
   tools: claudeCode.tools,
   skills: [codeSimplifier],
 });
