@@ -176,6 +176,31 @@ describe('TelegramClient', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
+  test('sendMessage forwards message_thread_id so drafts finalize in-topic', async () => {
+    let body: Record<string, unknown> = {};
+    spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({ ok: true, result: { message_id: 1 } }),
+        {
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    }) as never);
+
+    const client = new TelegramClient('token');
+    await client.sendMessage(42, 'done', { messageThreadId: 9 });
+
+    expect(body).toMatchObject({
+      chat_id: 42,
+      text: 'done',
+      message_thread_id: 9,
+    });
+  });
+
   test('refuses to auto-split formatted text over the limit', async () => {
     const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
       (async () =>

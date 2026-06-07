@@ -50,6 +50,9 @@ interface SendMessageOptions {
   parseMode?: 'MarkdownV2' | 'HTML';
   replyToMessageId?: number;
   disableNotification?: boolean;
+  // The thread (topic) to send into, for forum supergroups. Match the
+  // messageThreadId of an in-progress draft to finalize into the same topic.
+  messageThreadId?: number;
   // Maps to link_preview_options.is_disabled when false.
   linkPreview?: boolean;
 }
@@ -296,6 +299,9 @@ class TelegramClient {
           chat_id: chatId,
           text: chunk,
           ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
+          ...(opts?.messageThreadId !== undefined
+            ? { message_thread_id: opts.messageThreadId }
+            : {}),
           ...(opts?.replyToMessageId
             ? { reply_parameters: { message_id: opts.replyToMessageId } }
             : {}),
