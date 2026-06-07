@@ -333,12 +333,12 @@ class GithubReceiver {
   };
 }
 
-function githubTrigger(options: GithubReceiverOptions): GithubReceiver {
+function github(options: GithubReceiverOptions): GithubReceiver {
   return new GithubReceiver(options);
 }
 
 export {
-  githubTrigger,
+  github,
   GithubReceiver,
   type GithubComment,
   type GithubIssue,

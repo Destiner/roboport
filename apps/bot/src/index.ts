@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import {
-  githubTrigger,
+  github,
   type PullRequestEvent,
   type PullRequestReviewCommentEvent,
 } from 'roboport/triggers';
@@ -47,7 +47,7 @@ if (ghAuthSetup.exitCode !== 0) {
 // The account the bot posts as; used to recognise its own review threads.
 const botLogin = githubApp.botLogin;
 
-const ghReceiver = githubTrigger({ secret: config.webhookSecret });
+const ghReceiver = github({ secret: config.webhookSecret });
 
 const prReviewAgent = createPrReviewAgent(config);
 const docsUpdateAgent = createDocsUpdateAgent(config);

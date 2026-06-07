@@ -333,12 +333,12 @@ class TelegramClient {
   }
 }
 
-function telegramTrigger(options: TelegramReceiverOptions): TelegramReceiver {
+function telegram(options: TelegramReceiverOptions): TelegramReceiver {
   return new TelegramReceiver(options);
 }
 
 export {
-  telegramTrigger,
+  telegram,
   TelegramClient,
   TelegramReceiver,
   splitMessage,
