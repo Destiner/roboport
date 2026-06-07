@@ -54,6 +54,14 @@ interface SendMessageOptions {
   linkPreview?: boolean;
 }
 
+interface SendMessageDraftOptions {
+  parseMode?: 'MarkdownV2' | 'HTML';
+  // The thread (topic) to draft into, for forum supergroups.
+  messageThreadId?: number;
+  // Maps to link_preview_options.is_disabled when false.
+  linkPreview?: boolean;
+}
+
 interface TelegramReceiverOptions {
   secretToken: string;
   updateCacheSize?: number;
@@ -315,6 +323,41 @@ class TelegramClient {
     });
   }
 
+  // Streams a partial message as an ephemeral draft bubble while the reply is
+  // still being generated (Bot API 9.3+). Successive calls with the same
+  // non-zero draftId animate in place; the draft auto-expires after ~30s, so
+  // the caller must persist the result with sendMessage once generation ends.
+  // An empty text clears the draft (Bot API 10.0+). A draft is a single bubble
+  // and can't be split, so text must fit the 4096-unit limit — keep the draft
+  // within bounds and let the final sendMessage handle chunking.
+  async sendMessageDraft(
+    chatId: number | string,
+    draftId: number,
+    text: string,
+    opts?: SendMessageDraftOptions,
+  ): Promise<boolean> {
+    if (!Number.isInteger(draftId) || draftId === 0) {
+      throw new Error('sendMessageDraft: draftId must be a non-zero integer');
+    }
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      throw new Error(
+        `sendMessageDraft: text exceeds ${MAX_MESSAGE_LENGTH} chars; a draft is a single bubble and can't be split. Truncate it and persist the full reply via sendMessage.`,
+      );
+    }
+    return this.call<boolean>('sendMessageDraft', {
+      chat_id: chatId,
+      draft_id: draftId,
+      text,
+      ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
+      ...(opts?.messageThreadId !== undefined
+        ? { message_thread_id: opts.messageThreadId }
+        : {}),
+      ...(opts?.linkPreview === false
+        ? { link_preview_options: { is_disabled: true } }
+        : {}),
+    });
+  }
+
   setWebhook(
     url: string,
     opts?: { secretToken?: string; allowedUpdates?: string[] },
@@ -342,6 +385,7 @@ export {
   TelegramClient,
   TelegramReceiver,
   splitMessage,
+  type SendMessageDraftOptions,
   type SendMessageOptions,
   type TelegramChat,
   type TelegramChatAction,

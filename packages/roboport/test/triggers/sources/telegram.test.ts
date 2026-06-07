@@ -191,6 +191,63 @@ describe('TelegramClient', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  test('sendMessageDraft posts draft_id and text in one call', async () => {
+    let body: Record<string, unknown> = {};
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(JSON.stringify({ ok: true, result: true }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as never);
+
+    const client = new TelegramClient('token');
+    const ok = await client.sendMessageDraft(42, 7, 'partial', {
+      messageThreadId: 9,
+    });
+
+    expect(ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(body).toMatchObject({
+      chat_id: 42,
+      draft_id: 7,
+      text: 'partial',
+      message_thread_id: 9,
+    });
+  });
+
+  test('sendMessageDraft rejects a zero draftId without calling the API', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: true }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(client.sendMessageDraft(42, 0, 'hi')).rejects.toThrow(
+      'non-zero',
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test('sendMessageDraft refuses text over the single-bubble limit', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: true }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(
+      client.sendMessageDraft(42, 1, 'x'.repeat(5000)),
+    ).rejects.toThrow('single bubble');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   test('throws when the API responds with ok: false', async () => {
     spyOn(globalThis, 'fetch').mockImplementation(
       (async () =>
