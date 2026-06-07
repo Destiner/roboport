@@ -335,7 +335,7 @@ class TelegramClient {
   // and can't be split, so text must fit the 4096-unit limit — keep the draft
   // within bounds and let the final sendMessage handle chunking.
   async sendMessageDraft(
-    chatId: number | string,
+    chatId: number,
     draftId: number,
     text: string,
     opts?: SendMessageDraftOptions,
