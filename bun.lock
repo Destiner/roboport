@@ -20,6 +20,7 @@
       "dependencies": {
         "hono": "^4.0.0",
         "roboport": "workspace:*",
+        "zod": "^4.4.3",
       },
     },
     "apps/docs": {
@@ -40,11 +41,12 @@
     "packages/roboport": {
       "name": "roboport",
       "version": "0.0.1",
-      "dependencies": {
-        "zod": "^4.4.3",
-      },
       "devDependencies": {
         "tsc-alias": "^1.8.17",
+        "zod": "^4.4.3",
+      },
+      "peerDependencies": {
+        "zod": "^4.0.0",
       },
     },
   },

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z4 from 'zod/v4/core';
 
 import type { Message, TextPart, ThinkingPart, ToolCallPart } from './message';
 
@@ -63,11 +63,18 @@ interface ToolContext {
   cwd: string;
 }
 
-type ZodToolInit<TSchema extends z.ZodTypeAny, TResult> = {
+// Schemas are consumed through `zod/v4/core` rather than the full `zod`
+// entrypoint so the framework stays decoupled from the builder API: any Zod 4
+// schema (Classic or Mini) the consumer brings via their own zod peer satisfies
+// `$ZodType`.
+type ZodToolInit<TSchema extends z4.$ZodType, TResult> = {
   name: string;
   description: string;
   inputSchema: TSchema;
-  execute: (input: z.infer<TSchema>, ctx: ToolContext) => MaybePromise<TResult>;
+  execute: (
+    input: z4.output<TSchema>,
+    ctx: ToolContext,
+  ) => MaybePromise<TResult>;
   deferred?: boolean;
 };
 
@@ -79,11 +86,11 @@ type RawToolInit<TResult> = {
   deferred?: boolean;
 };
 
-type ToolInit<TSchema extends z.ZodTypeAny, TResult> =
+type ToolInit<TSchema extends z4.$ZodType, TResult> =
   | ZodToolInit<TSchema, TResult>
   | RawToolInit<TResult>;
 
-class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
+class Tool<TSchema extends z4.$ZodType = z4.$ZodType, TResult = unknown> {
   name: string;
   description: string;
   inputSchema?: TSchema;
@@ -116,11 +123,11 @@ class Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TResult = unknown> {
         `Tool "${this.name}" has neither inputSchema nor jsonSchema.`,
       );
     }
-    return z.toJSONSchema(this.inputSchema) as object;
+    return z4.toJSONSchema(this.inputSchema) as object;
   }
 
   parse(input: unknown): unknown {
-    if (this.inputSchema) return this.inputSchema.parse(input);
+    if (this.inputSchema) return z4.parse(this.inputSchema, input);
     return input;
   }
 }
