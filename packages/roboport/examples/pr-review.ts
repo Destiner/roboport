@@ -7,7 +7,7 @@ import { logEvents, logMessages } from './common';
 
 const agent = new Agent({
   model: new OpenAIModel('gpt-5.5', { thinking: 'high' }),
-  prompt: codex.system,
+  system: codex.system,
   tools: codex.tools,
   skills: [prReview],
 });

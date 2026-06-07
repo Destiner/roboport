@@ -17,7 +17,7 @@ function createPrReviewAgent(config: Config): Agent {
       auth: { type: 'codex', authFile: config.codexAuthFile },
       thinking: 'high',
     }),
-    prompt: codex.system,
+    system: codex.system,
     tools: codex.tools,
     skills: [prReview],
   });
