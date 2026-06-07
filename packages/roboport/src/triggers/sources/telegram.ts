@@ -61,8 +61,6 @@ interface SendMessageDraftOptions {
   parseMode?: 'MarkdownV2' | 'HTML';
   // The thread (topic) to draft into, for forum supergroups.
   messageThreadId?: number;
-  // Maps to link_preview_options.is_disabled when false.
-  linkPreview?: boolean;
 }
 
 interface TelegramReceiverOptions {
@@ -357,9 +355,6 @@ class TelegramClient {
       ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
       ...(opts?.messageThreadId !== undefined
         ? { message_thread_id: opts.messageThreadId }
-        : {}),
-      ...(opts?.linkPreview === false
-        ? { link_preview_options: { is_disabled: true } }
         : {}),
     });
   }
