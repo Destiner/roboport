@@ -99,12 +99,12 @@ class LinearReceiver {
   };
 }
 
-function linearTrigger(): LinearReceiver {
+function linear(): LinearReceiver {
   return new LinearReceiver();
 }
 
 export {
-  linearTrigger,
+  linear,
   LinearReceiver,
   type LinearAction,
   type LinearCommentEvent,

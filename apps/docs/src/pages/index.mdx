@@ -18,7 +18,7 @@ import { Agent } from 'roboport';
 import { claudeCode } from 'roboport/harness';
 import { AnthropicModel } from 'roboport/models';
 import { prReview } from 'roboport/skills';
-import { githubTrigger } from 'roboport/triggers';
+import { github } from 'roboport/triggers';
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
@@ -27,9 +27,9 @@ const agent = new Agent({
   skills: [prReview],
 });
 
-const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+const gh = github({ secret: process.env.GITHUB_WEBHOOK_SECRET });
 agent.on(
-  github.pullRequest({ actions: ['opened', 'synchronize'] }),
+  gh.pullRequest({ actions: ['opened', 'synchronize'] }),
   async (event) => {
     await using session = agent.session();
     await session.send(

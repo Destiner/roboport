@@ -3,7 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   splitMessage,
   TelegramClient,
-  telegramTrigger,
+  telegram,
   type TelegramMessage,
 } from '@/triggers/sources/telegram';
 
@@ -36,7 +36,7 @@ function privateMessage(
 
 describe('TelegramReceiver.handle', () => {
   test('dispatches message updates when the secret matches', async () => {
-    const receiver = telegramTrigger({ secretToken: SECRET });
+    const receiver = telegram({ secretToken: SECRET });
     const events: TelegramMessage[] = [];
     receiver.message().start((m) => events.push(m));
 
@@ -50,7 +50,7 @@ describe('TelegramReceiver.handle', () => {
   });
 
   test('rejects a missing or wrong secret token without dispatching', async () => {
-    const receiver = telegramTrigger({ secretToken: SECRET });
+    const receiver = telegram({ secretToken: SECRET });
     const events: TelegramMessage[] = [];
     receiver.message().start((m) => events.push(m));
 
@@ -67,7 +67,7 @@ describe('TelegramReceiver.handle', () => {
   });
 
   test('drops duplicate update_id replays', async () => {
-    const receiver = telegramTrigger({ secretToken: SECRET });
+    const receiver = telegram({ secretToken: SECRET });
     const events: TelegramMessage[] = [];
     receiver.message().start((m) => events.push(m));
 
@@ -81,7 +81,7 @@ describe('TelegramReceiver.handle', () => {
   });
 
   test('command filter only matches configured commands', async () => {
-    const receiver = telegramTrigger({ secretToken: SECRET });
+    const receiver = telegram({ secretToken: SECRET });
     const events: TelegramMessage[] = [];
     receiver.message({ commands: ['start'] }).start((m) => events.push(m));
 
@@ -103,7 +103,7 @@ describe('TelegramReceiver.handle', () => {
   });
 
   test('botUsername routes @-addressed commands to this bot only', async () => {
-    const receiver = telegramTrigger({ secretToken: SECRET });
+    const receiver = telegram({ secretToken: SECRET });
     const events: TelegramMessage[] = [];
     receiver
       .message({ commands: ['start'], botUsername: 'mybot' })

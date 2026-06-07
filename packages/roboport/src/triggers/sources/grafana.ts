@@ -68,12 +68,12 @@ class GrafanaReceiver {
   };
 }
 
-function grafanaTrigger(): GrafanaReceiver {
+function grafana(): GrafanaReceiver {
   return new GrafanaReceiver();
 }
 
 export {
-  grafanaTrigger,
+  grafana,
   GrafanaReceiver,
   type AlertStatus,
   type GrafanaAlert,

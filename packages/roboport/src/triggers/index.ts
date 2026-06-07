@@ -7,7 +7,7 @@ import {
 } from './core';
 import { cron, type CronEvent } from './sources/cron';
 import {
-  githubTrigger,
+  github,
   GithubReceiver,
   type GithubReviewComment,
   type IssueCommentEvent,
@@ -17,19 +17,19 @@ import {
   type PushEvent,
 } from './sources/github';
 import {
-  grafanaTrigger,
+  grafana,
   GrafanaReceiver,
   type GrafanaAlertEvent,
 } from './sources/grafana';
 import {
-  linearTrigger,
+  linear,
   LinearReceiver,
   type LinearCommentEvent,
   type LinearIssueEvent,
   type LinearProjectEvent,
 } from './sources/linear';
 import {
-  telegramTrigger,
+  telegram,
   TelegramClient,
   TelegramReceiver,
   splitMessage,
@@ -44,14 +44,14 @@ import {
 
 export {
   cron,
-  githubTrigger,
+  github,
   GithubReceiver,
-  grafanaTrigger,
+  grafana,
   GrafanaReceiver,
-  linearTrigger,
+  linear,
   LinearReceiver,
   splitMessage,
-  telegramTrigger,
+  telegram,
   TelegramClient,
   TelegramReceiver,
   trigger,

@@ -18,7 +18,7 @@ import { Agent } from 'roboport';
 import { claudeCode } from 'roboport/harness';
 import { AnthropicModel } from 'roboport/models';
 import { prReview } from 'roboport/skills';
-import { githubTrigger } from 'roboport/triggers';
+import { github } from 'roboport/triggers';
 
 const agent = new Agent({
   model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
@@ -27,9 +27,9 @@ const agent = new Agent({
   skills: [prReview],
 });
 
-const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+const gh = github({ secret: process.env.GITHUB_WEBHOOK_SECRET });
 agent.on(
-  github.pullRequest({ actions: ['opened', 'synchronize'] }),
+  gh.pullRequest({ actions: ['opened', 'synchronize'] }),
   async (event) => {
     await using session = agent.session();
     await session.send(
@@ -113,7 +113,7 @@ MCP tools are deferred by default and surfaced via `ToolSearch`.
 A trigger is an event source. The handler decides whether to start the agent.
 
 ```ts
-import { cron, githubTrigger } from 'roboport/triggers';
+import { cron, github } from 'roboport/triggers';
 
 // Time-based, fires in-process
 agent.on(cron({ schedule: { every: 'day', at: { hour: 9 } } }), async () => {
@@ -122,8 +122,8 @@ agent.on(cron({ schedule: { every: 'day', at: { hour: 9 } } }), async () => {
 });
 
 // Webhook-based
-const github = githubTrigger({ secret: process.env.GITHUB_WEBHOOK_SECRET });
-agent.on(github.pullRequest({ actions: ['opened'] }), async (event) => {
+const gh = github({ secret: process.env.GITHUB_WEBHOOK_SECRET });
+agent.on(gh.pullRequest({ actions: ['opened'] }), async (event) => {
   await using session = agent.session();
   await session.send(`Review PR #${event.number}.`);
 });
@@ -134,7 +134,7 @@ await agent.start();
 A webhook trigger needs a URL to receive events. Bind the receiver's `handle` to a route:
 
 ```ts
-app.post('/webhooks/github', (c) => github.handle(c.req.raw));
+app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
 ```
 
 ## Status
