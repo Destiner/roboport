@@ -50,8 +50,17 @@ interface SendMessageOptions {
   parseMode?: 'MarkdownV2' | 'HTML';
   replyToMessageId?: number;
   disableNotification?: boolean;
+  // The thread (topic) to send into, for forum supergroups. Match the
+  // messageThreadId of an in-progress draft to finalize into the same topic.
+  messageThreadId?: number;
   // Maps to link_preview_options.is_disabled when false.
   linkPreview?: boolean;
+}
+
+interface SendMessageDraftOptions {
+  parseMode?: 'MarkdownV2' | 'HTML';
+  // The thread (topic) to draft into, for forum supergroups.
+  messageThreadId?: number;
 }
 
 interface TelegramReceiverOptions {
@@ -288,6 +297,9 @@ class TelegramClient {
           chat_id: chatId,
           text: chunk,
           ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
+          ...(opts?.messageThreadId !== undefined
+            ? { message_thread_id: opts.messageThreadId }
+            : {}),
           ...(opts?.replyToMessageId
             ? { reply_parameters: { message_id: opts.replyToMessageId } }
             : {}),
@@ -312,6 +324,38 @@ class TelegramClient {
       message_id: messageId,
       text,
       ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
+    });
+  }
+
+  // Streams a partial message as an ephemeral draft bubble while the reply is
+  // still being generated (Bot API 9.3+). Successive calls with the same
+  // non-zero draftId animate in place; the draft auto-expires after ~30s, so
+  // the caller must persist the result with sendMessage once generation ends.
+  // An empty text clears the draft (Bot API 10.0+). A draft is a single bubble
+  // and can't be split, so text must fit the 4096-unit limit — keep the draft
+  // within bounds and let the final sendMessage handle chunking.
+  async sendMessageDraft(
+    chatId: number,
+    draftId: number,
+    text: string,
+    opts?: SendMessageDraftOptions,
+  ): Promise<boolean> {
+    if (!Number.isInteger(draftId) || draftId === 0) {
+      throw new Error('sendMessageDraft: draftId must be a non-zero integer');
+    }
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      throw new Error(
+        `sendMessageDraft: text exceeds ${MAX_MESSAGE_LENGTH} chars; a draft is a single bubble and can't be split. Truncate it and persist the full reply via sendMessage.`,
+      );
+    }
+    return this.call<boolean>('sendMessageDraft', {
+      chat_id: chatId,
+      draft_id: draftId,
+      text,
+      ...(opts?.parseMode ? { parse_mode: opts.parseMode } : {}),
+      ...(opts?.messageThreadId !== undefined
+        ? { message_thread_id: opts.messageThreadId }
+        : {}),
     });
   }
 
@@ -342,6 +386,7 @@ export {
   TelegramClient,
   TelegramReceiver,
   splitMessage,
+  type SendMessageDraftOptions,
   type SendMessageOptions,
   type TelegramChat,
   type TelegramChatAction,
