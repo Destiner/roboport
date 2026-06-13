@@ -9,9 +9,14 @@
     "check:eslint": "bun --filter '*' check:eslint",
     "test": "bun --filter '*' test",
     "typecheck": "bun --filter '*' typecheck",
-    "docs": "bun --filter @roboport/docs dev"
+    "docs": "bun --filter @roboport/docs dev",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "bun scripts/release.ts"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.3.10",
     "eslint": "^10.0.3",

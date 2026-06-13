@@ -1,11 +1,12 @@
-import { writeFile } from 'fs/promises';
+import { access, copyFile, writeFile } from 'fs/promises';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import pkg from '../package.json' with { type: 'json' };
 
 const here = dirname(fileURLToPath(import.meta.url));
-const distDir = resolve(here, '..', 'dist');
+const packageDir = resolve(here, '..');
+const distDir = resolve(packageDir, 'dist');
 
 const subpaths = ['harness', 'mcp', 'models', 'skills', 'triggers'] as const;
 
@@ -24,8 +25,13 @@ const source = pkg as Record<string, unknown>;
 const distManifest: Record<string, unknown> = {
   name: pkg.name,
   version: pkg.version,
+  description: pkg.description,
   author: pkg.author,
   license: pkg.license,
+  repository: pkg.repository,
+  homepage: pkg.homepage,
+  bugs: pkg.bugs,
+  keywords: pkg.keywords,
   type: pkg.type,
   main: './index.js',
   types: './index.d.ts',
@@ -44,3 +50,15 @@ await writeFile(
   resolve(distDir, 'package.json'),
   JSON.stringify(distManifest, null, 2) + '\n',
 );
+
+// Carry the README and license into the package so npm renders them on the
+// package page; LICENSE is optional today (the manifest declares UNLICENSED).
+for (const file of ['README.md', 'LICENSE']) {
+  const from = resolve(packageDir, file);
+  try {
+    await access(from);
+  } catch {
+    continue;
+  }
+  await copyFile(from, resolve(distDir, file));
+}

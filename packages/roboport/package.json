@@ -1,11 +1,30 @@
 {
   "name": "roboport",
   "version": "0.0.1",
+  "description": "Minimal TypeScript framework for building LLM agents.",
   "author": {
     "name": "Timur Badretdinov",
     "url": "https://github.com/Destiner"
   },
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Destiner/roboport.git",
+    "directory": "packages/roboport"
+  },
+  "homepage": "https://github.com/Destiner/roboport#readme",
+  "bugs": {
+    "url": "https://github.com/Destiner/roboport/issues"
+  },
+  "keywords": [
+    "llm",
+    "agent",
+    "ai",
+    "mcp",
+    "anthropic",
+    "openai",
+    "typescript"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
