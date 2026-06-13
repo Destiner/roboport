@@ -1,5 +1,11 @@
 # roboport
 
+## 0.4.0
+
+### Minor Changes
+
+- [#60](https://github.com/Destiner/roboport/pull/60) [`27df797`](https://github.com/Destiner/roboport/commit/27df7970e1fa598ce29ac19c9af96aa8a4c3b0aa) Thanks [@Destiner](https://github.com/Destiner)! - Add `Github` and `Slack` MCP client presets to `roboport/mcp`. `Github` wraps the hosted GitHub MCP server with a personal access token (with optional `toolsets` and `readOnly` scoping); `Slack` exposes a curated set of Slack Web API tools (post message, reply in thread, list channels, channel history, users, reactions) via a bot token.
+
 ## 0.3.0
 
 ### Minor Changes
