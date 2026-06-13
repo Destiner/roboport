@@ -8,6 +8,7 @@ type Options = {
   toolsets?: string[];
   // Expose only read-only tools.
   readOnly?: boolean;
+  deferred?: boolean;
 };
 
 const GITHUB_MCP_URL = 'https://api.githubcopilot.com/mcp/';
@@ -23,6 +24,7 @@ class Mcp extends McpBase {
     }
     super({
       name: opts.name ?? 'github',
+      deferred: opts.deferred,
       transport: {
         type: 'http',
         url: GITHUB_MCP_URL,

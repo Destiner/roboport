@@ -279,6 +279,17 @@ class HttpTransport implements Transport {
   }
 }
 
+// The name becomes part of every tool name (`mcp__<name>__<tool>`), which
+// providers constrain to `[A-Za-z0-9_-]`. Reject bad names at construction
+// rather than letting them fail later at model-request time.
+function validateMcpName(name: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    throw new Error(
+      `Invalid MCP name "${name}": use only letters, digits, underscores, and hyphens.`,
+    );
+  }
+}
+
 function formatContent(content: ContentBlock[]): string {
   if (content.length === 1 && content[0]?.type === 'text') {
     return content[0].text ?? '';
@@ -305,14 +316,7 @@ class Mcp implements McpClient {
     transport: McpTransportConfig;
     deferred?: boolean;
   }) {
-    // The name becomes part of every tool name (`mcp__<name>__<tool>`), which
-    // providers constrain to `[A-Za-z0-9_-]`. Reject bad names at construction
-    // rather than letting them fail later at model-request time.
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      throw new Error(
-        `Invalid MCP name "${name}": use only letters, digits, underscores, and hyphens.`,
-      );
-    }
+    validateMcpName(name);
     this.name = name;
     this.transport = transport;
     this.deferred = deferred ?? true;
@@ -371,6 +375,7 @@ class Mcp implements McpClient {
 
 export {
   Mcp,
+  validateMcpName,
   type McpTransportConfig,
   type StdioTransportConfig,
   type HttpTransportConfig,

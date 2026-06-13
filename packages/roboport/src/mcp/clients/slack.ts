@@ -1,8 +1,17 @@
 import { Tool, type McpClient } from '@/core';
 
 import { BearerAuth, type AuthProvider } from '../auth';
+import { validateMcpName } from '../core';
 
 type Options = {
+  /**
+   * Slack bot token (`xoxb-…`). Requires these OAuth scopes:
+   * `chat:write` (post_message, reply_in_thread),
+   * `channels:read` (list_channels),
+   * `channels:history` (get_channel_history),
+   * `users:read` (list_users, get_user),
+   * `reactions:write` (add_reaction).
+   */
   botToken: string;
   name?: string;
   deferred?: boolean;
@@ -216,6 +225,7 @@ class Mcp implements McpClient {
   constructor(opts: Options) {
     this.auth = new BearerAuth(opts.botToken);
     this.nameSpace = opts.name ?? 'slack';
+    validateMcpName(this.nameSpace);
     this.deferred = opts.deferred ?? true;
   }
 
