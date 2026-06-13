@@ -4,8 +4,10 @@ import {
   type AuthProvider,
   type OAuthAuthOptions,
 } from './auth';
+import Github from './clients/github';
 import Grafana from './clients/grafana';
 import Linear from './clients/linear';
+import Slack from './clients/slack';
 import Tenderly from './clients/tenderly';
 import {
   Mcp,
@@ -23,11 +25,13 @@ import {
 export {
   BearerAuth,
   FileStorage,
+  Github,
   Grafana,
   Linear,
   Mcp,
   MemoryStorage,
   OAuthAuth,
+  Slack,
   Tenderly,
   type AuthProvider,
   type HttpTransportConfig,

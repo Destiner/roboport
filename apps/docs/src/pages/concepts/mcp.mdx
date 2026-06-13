@@ -4,22 +4,26 @@ Connect Model Context Protocol servers; their tools join the agent's tool set. P
 
 Built-in MCP clients:
 
+- GitHub: `Github`
 - Grafana: `Grafana`
 - Linear: `Linear`
+- Slack: `Slack`
 - Tenderly: `Tenderly`
 
 ```ts
 import { Agent } from 'roboport';
-import { Grafana, Linear } from 'roboport/mcp';
+import { Github, Grafana, Linear, Slack } from 'roboport/mcp';
 
 const agent = new Agent({
   // …
   mcp: [
+    new Github({ token: process.env.GITHUB_TOKEN }),
     new Grafana({
       url: process.env.GRAFANA_URL,
       serviceAccountToken: process.env.GRAFANA_TOKEN,
     }),
     new Linear({ apiKey: process.env.LINEAR_API_KEY }),
+    new Slack({ botToken: process.env.SLACK_BOT_TOKEN }),
   ],
 });
 ```
