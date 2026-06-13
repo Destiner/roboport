@@ -266,8 +266,8 @@ class SlackClient {
     return this.call<SlackPostMessageResult>('chat.postMessage', {
       channel,
       text,
-      ...(opts?.threadTs ? { thread_ts: opts.threadTs } : {}),
-      ...(opts?.blocks ? { blocks: opts.blocks } : {}),
+      thread_ts: opts?.threadTs || undefined,
+      blocks: opts?.blocks,
     });
   }
 
