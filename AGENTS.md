@@ -31,7 +31,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/gateways/` - Gateway primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
   - `src/harness/` - `Harness` bundle, presets, and reusable tools in `tools.ts` (file and shell tools delegate to the `shared.ts` helpers)
   - `src/skills/` - Opt-in skill bundle; each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
-  - `src/triggers/` - Trigger primitive: `cron`, webhook receivers, and the Telegram Bot API client
+  - `src/triggers/` - Trigger primitives and receivers
   - `examples/` - Standalone usage examples
 - `apps/bot/` - Webhook-driven runner. Hono server mounts `GithubReceiver` at `POST /webhooks/github`, dispatches `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows for actionable PR and review-comment events, and opens advisory GitHub check runs for PR workflows. Deployed to Railway via `apps/bot/Dockerfile`; codex auth/refresh tokens persist on a mounted volume.
 - `apps/docs/` - Vocs docs site (`name: "@roboport/docs"`).
