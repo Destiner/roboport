@@ -46,10 +46,18 @@ const POLL_BACKOFF_MS = 1000;
 const DRAFT_THROTTLE_MS = 500;
 const DRAFT_MAX_LENGTH = 4096;
 
+// Key per forum topic when present, so each topic is an independent session;
+// otherwise per chat. Drafts/replies are routed back to the same topic.
+function conversationKey(message: TelegramMessage): string {
+  return message.message_thread_id !== undefined
+    ? `${message.chat.id}:${message.message_thread_id}`
+    : String(message.chat.id);
+}
+
 function toInbound(message: TelegramMessage): InboundMessage {
   return {
     id: String(message.message_id),
-    conversationId: String(message.chat.id),
+    conversationId: conversationKey(message),
     text: message.text ?? message.caption ?? '',
     user: message.from
       ? {
@@ -89,24 +97,32 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
 
   function channelFor(message: TelegramMessage): TelegramChannel {
     const chatId = message.chat.id;
-    const draftId = message.message_id;
+    const threadId = message.message_thread_id;
     return {
-      conversationId: String(chatId),
+      conversationId: conversationKey(message),
       chatId,
       client,
+      // Default replies/drafts to the originating topic; caller opts win.
       send: async (text: string, opts?: SendMessageOptions): Promise<void> => {
-        await client.sendMessage(chatId, text, opts);
+        await client.sendMessage(chatId, text, {
+          messageThreadId: threadId,
+          ...opts,
+        });
       },
       draft: async (text: string): Promise<void> => {
-        await client.sendMessageDraft(chatId, draftId, text);
+        await client.sendMessageDraft(chatId, message.message_id, text, {
+          messageThreadId: threadId,
+        });
       },
       thinking: (): (() => void) => startTyping(client, chatId),
     };
   }
 
   function forwards(message: TelegramMessage): boolean {
-    if (!options.commands) return true;
-    return matchesCommand(message, options.commands, options.botUsername);
+    return (
+      !options.commands ||
+      matchesCommand(message, options.commands, options.botUsername)
+    );
   }
 
   function deliver(
@@ -163,8 +179,11 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
               const message = update.message;
               if (message && forwards(message)) deliver(handler, message);
             }
-          } catch {
+          } catch (error) {
             if (controller.signal.aborted) break;
+            // Surface failures (e.g. a bad token) instead of silently retrying
+            // forever, then back off before the next poll.
+            console.error('[gateways] telegram polling error:', error);
             await sleep(POLL_BACKOFF_MS);
           }
         }
@@ -176,7 +195,9 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
 
 // Streaming relay for Telegram: refresh an ephemeral draft bubble as tokens
 // arrive (throttled), then commit the final text with sendMessage.
-function stream(options: { throttleMs?: number } = {}): Relay<TelegramChannel> {
+function stream(
+  options: { throttleMs?: number } = {},
+): Relay<InboundMessage, TelegramChannel> {
   const throttleMs = options.throttleMs ?? DRAFT_THROTTLE_MS;
   return async (turn, channel): Promise<void> => {
     const blocks: string[] = [];

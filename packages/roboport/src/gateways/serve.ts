@@ -1,12 +1,6 @@
 import { Agent, Session, type Message, type TextPart, type Turn } from '@/core';
 
-import type {
-  Channel,
-  Gateway,
-  GatewayHandler,
-  InboundMessage,
-  Relay,
-} from './core';
+import type { Channel, Gateway, InboundMessage, Relay } from './core';
 import { memoryStore, type ConversationStore } from './store';
 
 // Every default is a seam: start from `serve(agent, gateway)` and override only
@@ -19,14 +13,16 @@ interface ServeOptions<In extends InboundMessage, Ch extends Channel> {
   systemExtension?: (message: In) => string | Promise<string>;
   prompt?: (message: In) => string | TextPart[] | null;
   context?: (stored: Message[], message: In) => Message[] | Promise<Message[]>;
-  relay?: Relay<Ch>;
+  relay?: Relay<In, Ch>;
   store?: ConversationStore;
   onError?: (error: Error, channel: Ch, message: In) => void | Promise<void>;
 }
 
 interface GatewayRuntime {
   stop(): Promise<void>;
-  handle?(req: Request): Promise<Response>;
+  // Always present so webhook callers can mount it without a null check; in
+  // non-webhook (e.g. polling) transports it responds 404.
+  handle(req: Request): Promise<Response>;
 }
 
 function toUserMessage(prompt: string | TextPart[]): Message {
@@ -72,7 +68,7 @@ function serve<In extends InboundMessage, Ch extends Channel>(
   const store = options.store ?? memoryStore();
   const keyOf =
     options.conversation ?? ((message: In): string => message.conversationId);
-  const relay: Relay<Ch> = options.relay ?? gateway.relay ?? bufferReplies;
+  const relay: Relay<In, Ch> = options.relay ?? gateway.relay ?? bufferReplies;
   const queues = new Map<string, Promise<unknown>>();
 
   async function runTurn(message: In, channel: Ch, id: string): Promise<void> {
@@ -130,21 +126,26 @@ function serve<In extends InboundMessage, Ch extends Channel>(
     });
   }
 
-  const opened = Promise.resolve(
-    gateway.open(handler as GatewayHandler<In, Ch>),
-  );
-  opened.catch(() => {});
+  const opened = Promise.resolve(gateway.open(handler));
+  opened.catch((error: unknown) => {
+    console.error(`[gateways] ${gateway.name} failed to open:`, error);
+  });
 
-  const runtime: GatewayRuntime = {
-    async stop(): Promise<void> {
-      const unsub = await opened;
-      await unsub();
-    },
-  };
-  if (gateway.handle) {
-    runtime.handle = (req: Request): Promise<Response> => gateway.handle!(req);
+  function notWebhook(): Promise<Response> {
+    return Promise.resolve(
+      new Response('gateway is not in webhook mode', { status: 404 }),
+    );
   }
-  return runtime;
+
+  return {
+    async stop(): Promise<void> {
+      const unsub = await opened.catch(() => undefined);
+      if (unsub) await unsub();
+    },
+    handle: gateway.handle
+      ? (req: Request): Promise<Response> => gateway.handle!(req)
+      : notWebhook,
+  };
 }
 
 export { serve, type GatewayRuntime, type ServeOptions };

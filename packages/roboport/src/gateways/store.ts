@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -28,8 +29,13 @@ function memoryStore(): ConversationStore {
   };
 }
 
-function sanitize(id: string): string {
-  return id.replace(/[^a-zA-Z0-9_-]/g, '_');
+// A readable, collision-free filename for an arbitrary conversation id: a
+// sanitized prefix (so files stay greppable) plus a hash suffix (so distinct
+// ids that sanitize to the same prefix — `a/b` vs `a:b` — never share a file).
+function fileNameFor(id: string): string {
+  const prefix = id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  const hash = createHash('sha256').update(id).digest('hex').slice(0, 16);
+  return `${prefix}-${hash}.jsonl`;
 }
 
 // File-backed store: one JSONL file per conversation (one agent message per
@@ -37,7 +43,7 @@ function sanitize(id: string): string {
 // conversation, which serve guarantees via per-conversation serialization.
 function fileStore(dir: string): ConversationStore {
   function fileFor(id: string): string {
-    return join(dir, `${sanitize(id)}.jsonl`);
+    return join(dir, fileNameFor(id));
   }
   return {
     async load(id: string): Promise<Message[] | null> {

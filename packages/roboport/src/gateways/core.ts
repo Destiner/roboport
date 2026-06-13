@@ -32,11 +32,13 @@ type GatewayHandler<In extends InboundMessage, Ch extends Channel> = (
 
 // Turns a running turn's event stream into messages on the channel. Throwing
 // surfaces to serve's onError. The default buffers one reply per turn; a gateway
-// may ship a richer default (e.g. streaming edits) via Gateway.relay.
-type Relay<Ch extends Channel> = (
+// may ship a richer default (e.g. streaming edits) via Gateway.relay. Carries the
+// gateway's own `In` type (like the other seams), so a custom relay sees the
+// transport-specific message without casting through `raw`.
+type Relay<In extends InboundMessage, Ch extends Channel> = (
   turn: Turn,
   channel: Ch,
-  message: InboundMessage,
+  message: In,
 ) => Promise<void>;
 
 // A bidirectional connection between a transport and an agent. `open` mirrors
@@ -50,7 +52,7 @@ interface Gateway<
   name: string;
   open(handler: GatewayHandler<In, Ch>): MaybePromise<Unsub>;
   handle?(req: Request): Promise<Response>;
-  relay?: Relay<Ch>;
+  relay?: Relay<In, Ch>;
 }
 
 export type { Channel, Gateway, GatewayHandler, InboundMessage, Relay };

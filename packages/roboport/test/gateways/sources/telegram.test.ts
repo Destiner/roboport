@@ -72,7 +72,9 @@ describe('TelegramChannel', () => {
     spyOn(globalThis, 'fetch').mockRestore();
   });
 
-  async function captureChannel(): Promise<TelegramChannel> {
+  async function captureChannel(
+    overrides: Partial<TelegramMessage> = {},
+  ): Promise<TelegramChannel> {
     const gateway = telegramGateway({
       token: 't',
       transport: { mode: 'webhook', secretToken: SECRET },
@@ -82,7 +84,7 @@ describe('TelegramChannel', () => {
       channel = ch;
     });
     await gateway.handle!(
-      makeRequest({ update_id: 1, message: privateMessage() }),
+      makeRequest({ update_id: 1, message: privateMessage(overrides) }),
     );
     if (!channel) throw new Error('channel was not delivered');
     return channel;
@@ -104,6 +106,30 @@ describe('TelegramChannel', () => {
 
     await channel.send('reply');
     expect(body).toMatchObject({ chat_id: 42, text: 'reply' });
+  });
+
+  test('keys per forum topic and routes replies back to it', async () => {
+    const channel = await captureChannel({ message_thread_id: 9 });
+    expect(channel.conversationId).toBe('42:9');
+
+    let body: Record<string, unknown> = {};
+    spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({ ok: true, result: { message_id: 2 } }),
+        { headers: { 'content-type': 'application/json' } },
+      );
+    }) as never);
+
+    await channel.send('reply');
+    expect(body).toMatchObject({
+      chat_id: 42,
+      text: 'reply',
+      message_thread_id: 9,
+    });
   });
 
   test('draft relays through the client sendMessageDraft API', async () => {
