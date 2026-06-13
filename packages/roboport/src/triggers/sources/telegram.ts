@@ -251,11 +251,13 @@ class TelegramClient {
   private async call<T>(
     method: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<T> {
     const response = await fetch(`${this.baseUrl}/bot${this.token}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(params),
+      ...(signal ? { signal } : {}),
     });
     const data = (await response.json()) as TelegramApiResponse<T>;
     if (!data.ok) {
@@ -375,6 +377,28 @@ class TelegramClient {
       ...(opts?.dropPendingUpdates ? { drop_pending_updates: true } : {}),
     });
   }
+
+  // Long-polls for updates (no webhook). `timeout` is the server-side long-poll
+  // hold in seconds; `offset` acknowledges everything below it. Pass an
+  // AbortSignal to cancel the in-flight request when shutting down a poll loop.
+  getUpdates(opts?: {
+    offset?: number;
+    timeout?: number;
+    allowedUpdates?: string[];
+    signal?: AbortSignal;
+  }): Promise<TelegramUpdate[]> {
+    return this.call<TelegramUpdate[]>(
+      'getUpdates',
+      {
+        ...(opts?.offset !== undefined ? { offset: opts.offset } : {}),
+        ...(opts?.timeout !== undefined ? { timeout: opts.timeout } : {}),
+        ...(opts?.allowedUpdates
+          ? { allowed_updates: opts.allowedUpdates }
+          : {}),
+      },
+      opts?.signal,
+    );
+  }
 }
 
 function telegram(options: TelegramReceiverOptions): TelegramReceiver {
@@ -382,6 +406,7 @@ function telegram(options: TelegramReceiverOptions): TelegramReceiver {
 }
 
 export {
+  matchesCommand,
   telegram,
   TelegramClient,
   TelegramReceiver,

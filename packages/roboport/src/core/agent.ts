@@ -88,7 +88,10 @@ class Agent {
     await Promise.all(unsubs.map((u) => u()));
   }
 
-  buildSystem(allTools: Tool[]): string {
+  // `systemExtension` is appended verbatim after the core system prompt (and the
+  // skills/deferred sections). Gateways use it to inject per-turn context —
+  // standing instructions, memory — without mutating the static `Agent.system`.
+  buildSystem(allTools: Tool[], systemExtension?: string): string {
     let system = this.system;
     if (this.skills.length > 0) {
       const skillsList = this.skills
@@ -100,6 +103,9 @@ class Agent {
     if (deferred.length > 0) {
       const list = deferred.map((tool) => `- ${tool.name}`).join('\n');
       system = `${system}\n\n# Deferred tools\nThese tools are available but their schemas are not loaded. Use ToolSearch to load them before calling.\n${list}`;
+    }
+    if (systemExtension) {
+      system = `${system}\n\n${systemExtension}`;
     }
     return system;
   }
@@ -130,11 +136,16 @@ class Agent {
 
   // Build a fresh session, optionally seeded with a prior message history for
   // resumption. MCP connections are lazy — no I/O until the first send().
-  session(init?: { messages?: Message[]; cwd?: string }): Session {
+  session(init?: {
+    messages?: Message[];
+    cwd?: string;
+    systemExtension?: string;
+  }): Session {
     const initialMessages = init?.messages
       ? [...init.messages]
       : ([] as Message[]);
     const sessionCwd = init?.cwd ?? this.cwd ?? process.cwd();
+    const systemExtension = init?.systemExtension;
     const state: SessionState = {
       messages: initialMessages,
       store: new Map(),
@@ -184,7 +195,7 @@ class Agent {
         ) {
           state.messages.unshift({
             role: 'system',
-            content: this.buildSystem(allTools),
+            content: this.buildSystem(allTools, systemExtension),
           });
         }
       }
