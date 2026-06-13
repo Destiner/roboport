@@ -185,15 +185,17 @@ class Agent {
           tools: registry,
           cwd: sessionCwd,
         };
-        // Seed the message log with the system prompt once we know the tool set.
-        if (
-          state.messages.length === 0 ||
-          state.messages[0]?.role !== 'system'
-        ) {
-          state.messages.unshift({
-            role: 'system',
-            content: this.buildSystem(allTools, systemExtension),
-          });
+        // Ensure the leading message is the current system prompt. Replace a
+        // seeded/resumed one rather than skip it, so the latest systemExtension
+        // wins instead of a stale persisted system.
+        const systemMessage: Message = {
+          role: 'system',
+          content: this.buildSystem(allTools, systemExtension),
+        };
+        if (state.messages[0]?.role === 'system') {
+          state.messages[0] = systemMessage;
+        } else {
+          state.messages.unshift(systemMessage);
         }
       }
       return { tools: allTools, registry, ctx };
