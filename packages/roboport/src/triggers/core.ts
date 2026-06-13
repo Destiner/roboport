@@ -20,4 +20,11 @@ function trigger<T = unknown>(init: CustomTriggerInit<T>): Trigger<T> {
   return { name: init.name, start: init.start };
 }
 
-export { trigger, type Emit, type Trigger, type TriggerHandler, type Unsub };
+export {
+  trigger,
+  type Emit,
+  type MaybePromise,
+  type Trigger,
+  type TriggerHandler,
+  type Unsub,
+};
