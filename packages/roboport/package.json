@@ -28,6 +28,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./gateways": "./src/gateways/index.ts",
     "./harness": "./src/harness/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./models": "./src/models/index.ts",
@@ -41,7 +42,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && bun run build:js && bun run build:types && bun run build:manifest",
-    "build:js": "bun build ./src/index.ts ./src/harness/index.ts ./src/mcp/index.ts ./src/models/index.ts ./src/skills/index.ts ./src/triggers/index.ts --outdir ./dist --target bun --external zod --root ./src",
+    "build:js": "bun build ./src/index.ts ./src/gateways/index.ts ./src/harness/index.ts ./src/mcp/index.ts ./src/models/index.ts ./src/skills/index.ts ./src/triggers/index.ts --outdir ./dist --target bun --external zod --root ./src",
     "build:types": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
     "build:manifest": "bun scripts/build-manifest.ts",
     "dist:pack": "bun run build && cd dist && bun pm pack --destination .."

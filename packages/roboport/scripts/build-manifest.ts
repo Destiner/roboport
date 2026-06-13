@@ -8,7 +8,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(here, '..');
 const distDir = resolve(packageDir, 'dist');
 
-const subpaths = ['harness', 'mcp', 'models', 'skills', 'triggers'] as const;
+const subpaths = [
+  'gateways',
+  'harness',
+  'mcp',
+  'models',
+  'skills',
+  'triggers',
+] as const;
 
 const exportsField: Record<string, { types: string; import: string }> = {
   '.': { types: './index.d.ts', import: './index.js' },

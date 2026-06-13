@@ -12,6 +12,7 @@ export default defineConfig({
         { text: 'Skills', link: '/concepts/skills' },
         { text: 'MCP', link: '/concepts/mcp' },
         { text: 'Triggers', link: '/concepts/triggers' },
+        { text: 'Gateways', link: '/concepts/gateways' },
       ],
     },
   ],
