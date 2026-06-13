@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 
 import { Agent, Model, type ModelStreamEvent, type SearchHit } from '@/core';
 import {
@@ -146,6 +146,38 @@ describe('serve', () => {
 
     expect(sent).toHaveLength(0);
     expect(await store.load('c1')).toBeNull();
+  });
+
+  test('persists assistant turns across turns (memoryStore is not aliased)', async () => {
+    const store = memoryStore();
+    const { gateway, deliver, sent } = makeFakeGateway();
+    serve(stubAgent({ reply: 'r' }), gateway, { store });
+
+    deliver(inbound({ text: 'first' }));
+    await waitFor(() => sent.length === 1);
+    deliver(inbound({ text: 'second' }));
+    await waitFor(() => sent.length === 2);
+
+    const stored = await store.load('c1');
+    expect(stored?.map((m) => m.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+    ]);
+  });
+
+  test('default error reply is generic and does not leak the raw message', async () => {
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    const { gateway, deliver, sent } = makeFakeGateway();
+    serve(stubAgent({ throwError: 'secret upstream detail' }), gateway, {});
+
+    deliver(inbound());
+    await waitFor(() => sent.length === 1);
+
+    expect(sent[0]).toBe('Sorry — something went wrong.');
+    expect(sent[0]).not.toContain('secret upstream detail');
+    errorSpy.mockRestore();
   });
 
   test('onError receives a thrown turn error', async () => {

@@ -44,10 +44,11 @@ async function bufferReplies(turn: Turn, channel: Channel): Promise<void> {
   await channel.send(reply || '(no response)');
 }
 
+// Keep the user-facing default generic — raw errors can carry provider response
+// bodies or internal details. Callers wanting to surface specifics override onError.
 async function defaultError(error: Error, channel: Channel): Promise<void> {
-  await channel
-    .send(`Sorry — something went wrong: ${error.message}`)
-    .catch(() => {});
+  console.error('[gateways] turn failed:', error);
+  await channel.send('Sorry — something went wrong.').catch(() => {});
 }
 
 // Bind an agent to a gateway: one long-lived conversation per `conversationId`,
@@ -80,6 +81,8 @@ function serve<In extends InboundMessage, Ch extends Channel>(
       const seed = options.context
         ? await options.context(stored, message)
         : stored;
+      // Snapshot before the eager append below, which may alias `seed`.
+      const seedLength = seed.length;
       const systemExtension = options.systemExtension
         ? await options.systemExtension(message)
         : undefined;
@@ -93,7 +96,7 @@ function serve<In extends InboundMessage, Ch extends Channel>(
         await relay(turn, channel, message);
         stopThinking?.();
         stopThinking = undefined;
-        await store.append(id, ...newMessages(session, seed.length));
+        await store.append(id, ...newMessages(session, seedLength));
       } finally {
         await session.close();
       }

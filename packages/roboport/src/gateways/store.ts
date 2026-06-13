@@ -19,7 +19,8 @@ function memoryStore(): ConversationStore {
   const byId = new Map<string, Message[]>();
   return {
     load(id: string): Message[] | null {
-      return byId.get(id) ?? null;
+      const existing = byId.get(id);
+      return existing ? [...existing] : null;
     },
     append(id: string, ...messages: Message[]): void {
       const existing = byId.get(id);
