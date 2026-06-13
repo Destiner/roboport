@@ -1,5 +1,13 @@
 # roboport
 
+## 0.2.0
+
+### Minor Changes
+
+- [#55](https://github.com/Destiner/roboport/pull/55) [`01368b0`](https://github.com/Destiner/roboport/commit/01368b0a5b4cb950b4eb5f0f5954ae33044c2826) Thanks [@Destiner](https://github.com/Destiner)! - Export the `Mcp` client, transport config types, and auth providers (`BearerAuth`, `OAuthAuth`, `AuthProvider`, plus OAuth storage helpers) from `roboport/mcp`, so consumers can connect MCP servers that don't have a built-in preset.
+
+  `OAuthAuth` now accepts a pre-registered `clientId` for servers without dynamic client registration, and `Mcp` validates its `name` at construction (it becomes part of each tool name) instead of failing later at model-request time.
+
 ## 0.1.0
 
 ### Minor Changes
