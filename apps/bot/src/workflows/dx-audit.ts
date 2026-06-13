@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { Agent } from 'roboport';
 import { codex } from 'roboport/harness';
-import { OpenAIModel } from 'roboport/models';
+import { OpenAI } from 'roboport/models';
 import { developerExperience } from 'roboport/skills';
 import type { PullRequestEvent } from 'roboport/triggers';
 
@@ -13,7 +13,7 @@ import { startCheckRun } from '../github';
 
 function createDxAuditAgent(config: Config): Agent {
   return new Agent({
-    model: new OpenAIModel('gpt-5.5', {
+    model: new OpenAI('gpt-5.5', {
       auth: { type: 'codex', authFile: config.codexAuthFile },
       thinking: 'high',
     }),

@@ -13,7 +13,7 @@ import { readSse } from '@/core/stream';
 import { env } from '@/env';
 
 import { OpenAICodexAuth } from './openai-codex-auth';
-import { OpenAICompatibleModel } from './openai-compatible';
+import { OpenAICompatible } from './openai-compatible';
 
 const OPENAI_MODELS = [
   'gpt-5.5',
@@ -236,7 +236,7 @@ function mapResponsesStatus(status: string | undefined): StopReason {
   }
 }
 
-class OpenAIModel extends OpenAICompatibleModel {
+class OpenAI extends OpenAICompatible {
   private codexAuth?: OpenAICodexAuth;
 
   constructor(modelName: OpenAIModelName, options?: OpenAIModelOptions) {
@@ -687,7 +687,7 @@ function extractSearchHits(json: ResponsesJson): SearchHit[] {
 }
 
 export {
-  OpenAIModel,
+  OpenAI,
   OPENAI_MODELS,
   type OpenAIAuthOptions,
   type OpenAIModelOptions,

@@ -207,7 +207,7 @@ function toWire(messages: Message[]): {
   return { system, wireMessages };
 }
 
-class AnthropicModel extends Model {
+class Anthropic extends Model {
   modelName: string;
   apiKey: string;
   thinking: ThinkingLevel;
@@ -484,4 +484,4 @@ function parseToolInput(raw: string): unknown {
   }
 }
 
-export { AnthropicModel, ANTHROPIC_MODELS };
+export { Anthropic, ANTHROPIC_MODELS };

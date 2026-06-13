@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { Agent } from 'roboport';
 import { codex } from 'roboport/harness';
-import { OpenAIModel } from 'roboport/models';
+import { OpenAI } from 'roboport/models';
 import { codeSimplifier } from 'roboport/skills';
 import type {
   PullRequestEvent,
@@ -26,7 +26,7 @@ const SIMPLIFY_IDEA_MARKER = '<!-- roboport-simplify-idea -->';
 
 function createSimplifyAgent(config: Config): Agent {
   return new Agent({
-    model: new OpenAIModel('gpt-5.5', {
+    model: new OpenAI('gpt-5.5', {
       auth: { type: 'codex', authFile: config.codexAuthFile },
       thinking: 'medium',
     }),

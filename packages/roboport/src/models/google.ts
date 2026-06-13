@@ -6,7 +6,7 @@ import type {
 } from '@/core';
 import { env } from '@/env';
 
-import { OpenAICompatibleModel } from './openai-compatible';
+import { OpenAICompatible } from './openai-compatible';
 
 const GEMINI_MODELS = [
   'gemini-3.5-flash',
@@ -29,7 +29,7 @@ interface GenerateContentResponse {
   }[];
 }
 
-class GeminiModel extends OpenAICompatibleModel {
+class Gemini extends OpenAICompatible {
   constructor(
     modelName: GeminiModelName,
     options?: { apiKey?: string; baseUrl?: string; thinking?: ThinkingLevel },
@@ -108,4 +108,4 @@ class GeminiModel extends OpenAICompatibleModel {
   }
 }
 
-export { GeminiModel, GEMINI_MODELS };
+export { Gemini, GEMINI_MODELS };

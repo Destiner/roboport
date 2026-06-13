@@ -7,7 +7,7 @@ import type {
 import { env } from '@/env';
 
 import {
-  OpenAICompatibleModel,
+  OpenAICompatible,
   type OpenAIAssistantWireMessage,
 } from './openai-compatible';
 
@@ -33,7 +33,7 @@ interface MoonshotChatResponse {
   }[];
 }
 
-class MoonshotModel extends OpenAICompatibleModel {
+class Moonshot extends OpenAICompatible {
   constructor(
     modelName: MoonshotModelName,
     options?: { apiKey?: string; baseUrl?: string; thinking?: ThinkingLevel },
@@ -165,4 +165,4 @@ class MoonshotModel extends OpenAICompatibleModel {
   }
 }
 
-export { MoonshotModel, MOONSHOT_MODELS };
+export { Moonshot, MOONSHOT_MODELS };

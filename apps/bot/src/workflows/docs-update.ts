@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { Agent } from 'roboport';
 import { codex } from 'roboport/harness';
-import { OpenAIModel } from 'roboport/models';
+import { OpenAI } from 'roboport/models';
 import { docsUpdate } from 'roboport/skills';
 import type { PullRequestEvent } from 'roboport/triggers';
 
@@ -13,7 +13,7 @@ import { prHeadSha, startCheckRun } from '../github';
 
 function createDocsUpdateAgent(config: Config): Agent {
   return new Agent({
-    model: new OpenAIModel('gpt-5.5', {
+    model: new OpenAI('gpt-5.5', {
       auth: { type: 'codex', authFile: config.codexAuthFile },
       thinking: 'medium',
     }),
