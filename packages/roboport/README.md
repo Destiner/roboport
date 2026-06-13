@@ -8,8 +8,9 @@ Minimal TypeScript framework for building LLM agents.
 bun add roboport zod
 ```
 
-`zod` is a peer dependency, declare it in your own dependencies when you define
-Zod-backed tools.
+`roboport` is built for and tested on [Bun](https://bun.sh) and uses Bun-native
+APIs. `zod` is a required peer dependency — it is imported at runtime, so
+install it alongside the package.
 
 ## Exports
 

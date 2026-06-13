@@ -32,6 +32,7 @@ const distManifest: Record<string, unknown> = {
   homepage: pkg.homepage,
   bugs: pkg.bugs,
   keywords: pkg.keywords,
+  engines: pkg.engines,
   type: pkg.type,
   main: './index.js',
   types: './index.d.ts',

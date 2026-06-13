@@ -11,7 +11,7 @@
     "typecheck": "bun --filter '*' typecheck",
     "docs": "bun --filter @roboport/docs dev",
     "changeset": "changeset",
-    "version": "changeset version",
+    "version": "changeset version && bun install --lockfile-only",
     "release": "bun scripts/release.ts"
   },
   "devDependencies": {
