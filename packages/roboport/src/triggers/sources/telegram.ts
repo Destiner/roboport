@@ -21,7 +21,6 @@ interface TelegramChat {
 
 interface TelegramMessage {
   message_id: number;
-  // Forum supergroups (and threaded replies): the topic this message belongs to.
   message_thread_id?: number;
   from?: TelegramUser;
   chat: TelegramChat;
@@ -380,9 +379,7 @@ class TelegramClient {
     });
   }
 
-  // Long-polls for updates (no webhook). `timeout` is the server-side long-poll
-  // hold in seconds; `offset` acknowledges everything below it. Pass an
-  // AbortSignal to cancel the in-flight request when shutting down a poll loop.
+  // Long polling.
   getUpdates(opts?: {
     offset?: number;
     timeout?: number;

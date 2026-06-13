@@ -88,9 +88,6 @@ class Agent {
     await Promise.all(unsubs.map((u) => u()));
   }
 
-  // `systemExtension` is appended verbatim after the core system prompt (and the
-  // skills/deferred sections). Gateways use it to inject per-turn context —
-  // standing instructions, memory — without mutating the static `Agent.system`.
   buildSystem(allTools: Tool[], systemExtension?: string): string {
     let system = this.system;
     if (this.skills.length > 0) {
