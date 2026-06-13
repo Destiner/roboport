@@ -150,23 +150,8 @@ A gateway is a two-way connection between a chat transport and an agent: inbound
 ```ts
 import { serve, telegramGateway } from 'roboport/gateways';
 
-// Long-polling by default — no public URL needed.
+// Long-polling by default
 const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }));
-// later: await bot.stop();
-```
-
-Every default is a seam. Override only what you need — keying, auth, the prompt, the context the model sees each turn, the reply relay, or where history lives:
-
-```ts
-import { fileStore, serve, stream, telegramGateway } from 'roboport/gateways';
-
-const bot = serve(agent, telegramGateway({ token, transport: { mode: 'webhook', secretToken } }), {
-  authorize: (m) => m.user?.id === process.env.OWNER_ID, // gate before the model runs
-  relay: stream(), // stream tokens as an editable draft
-  store: fileStore('./conversations'), // durable history per chat
-});
-
-app.post('/webhooks/telegram', (c) => bot.handle(c.req.raw)); // webhook mode
 ```
 
 ## Status

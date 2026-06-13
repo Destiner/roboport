@@ -1,8 +1,8 @@
 # Gateways
 
-A gateway is a two-way connection between a chat transport (Telegram, Slack, …) and an agent. Where a [trigger](/concepts/triggers) is one-way — it fires an event and forgets — a gateway pairs every inbound message with a **conversation key** for session continuity and a **reply channel** to relay the answer back.
+A gateway is a two-way connection between a chat transport (Telegram, Slack, …) and an agent. Where a [trigger](/concepts/triggers) is one-way (it fires an event and forgets), a gateway accepts inbound messages from the **transport** and uses a **reply channel** to relay the answer back.
 
-`serve` binds an agent to a gateway: one long-lived conversation per chat, serialized so a user's rapid-fire messages run in order, with the agent's reply relayed back.
+Use `serve` to bind an agent to a gateway:
 
 ```ts
 import { serve, telegramGateway } from 'roboport/gateways';
@@ -11,68 +11,24 @@ const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }))
 // later: await bot.stop();
 ```
 
-That's a working bot: long-polling (no public URL), in-memory history per chat, a "typing…" indicator while the agent works, and one reply per turn.
-
 ## Transports
 
-Telegram supports two transports. Polling is the default — zero config, ideal for local development.
+Gateways support two transports.
+
+By default, polling is used. Zero config, ideal for local development.
+
+You can also use webhooks, which are recommended in production:
 
 ```ts
-// Webhook (recommended in production): mount `handle` in your HTTP server.
 const bot = serve(agent, telegramGateway({
   token: process.env.TELEGRAM_TOKEN,
   transport: { mode: 'webhook', secretToken: process.env.TELEGRAM_WEBHOOK_SECRET },
 }));
 
-app.post('/webhooks/telegram', (c) => bot.handle(c.req.raw));
-await bot.client.setWebhook(`${publicUrl}/webhooks/telegram`, {
+const route = '/webhooks/telegram'
+app.post(route, (c) => bot.handle(c.req.raw));
+await bot.client.setWebhook(`${publicUrl}${route}`, {
   secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
   allowedUpdates: ['message'],
-});
-```
-
-## Seams
-
-Every default is overridable. Pass only the options you need.
-
-```ts
-serve(agent, telegramGateway({ token }), {
-  conversation: (m) => m.user?.id ?? m.conversationId, // key by user, not chat
-  authorize: (m) => allowlist.has(m.user?.id ?? ''),     // gate before the model runs
-  prompt: (m) => `From ${m.user?.name}: ${m.text}`,      // shape the user turn
-  systemExtension: () => readMemoryFiles(),              // appended to agent.system, per turn
-  context: (stored) => stored.slice(-20),                // what the model sees this turn
-  relay: stream(),                                       // how the reply is delivered
-  store: fileStore('./conversations'),                   // where history lives
-  onError: (err, ch) => ch.send(`Failed: ${err.message}`),
-});
-```
-
-### Memory & context
-
-The store keeps the full conversation as agent messages, keyed by `conversationId`. Each turn, `context(stored, message)` decides what the model actually sees — the default replays everything. This is where you implement your own windowing, summarization, or memory policy: return a recent slice, prepend a summary you maintain, or load retrieved context. roboport stores and exposes the messages; the strategy is yours.
-
-`systemExtension` is the companion seam for the system prompt: keep static instructions on `agent.system`, and return per-turn content (a persona file, long-term memory) here. It's appended, not replacing the agent's prompt.
-
-### Persistence
-
-`memoryStore()` (the default) is in-process and lost on restart. `fileStore(dir)` persists one JSONL file per conversation and survives restarts. Implement `ConversationStore` yourself for Redis, Postgres, or a custom shape (e.g. terminal text with timestamps, or compaction on write).
-
-### Replies & presence
-
-The default relay buffers the turn's text and sends one message. `stream()` instead streams tokens into an editable Telegram draft, then commits the final message. The typing indicator is handled by the gateway — you don't configure it.
-
-### Session reset
-
-There's no built-in "new session" — the user never has to manage sessions. To support a command like `/new`, roll it yourself: treat it as a boundary in `context` (return only messages after the last `/new`), or clear the store you constructed. For full control, drop to the primitive below.
-
-## The primitive
-
-`serve` is built on `gateway.open(handler)`, which hands you each `(message, channel)` to route however you like — multi-agent fan-out, non-conversational flows, bespoke persistence. This is the escape hatch when the seams aren't enough.
-
-```ts
-const gateway = telegramGateway({ token });
-await gateway.open(async (message, channel) => {
-  await channel.send(`You said: ${message.text}`);
 });
 ```
