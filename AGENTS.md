@@ -10,6 +10,8 @@ Minimal TypeScript framework for building LLM agents.
 - `bun --filter roboport build` - Build the framework package into `dist`
 - `bun --filter roboport test` - Run the framework package unit tests
 - `bun run docs` - Start the docs site
+- `bun run changeset` - Add a Changesets entry for user-facing package changes
+- `bun run release` - Build and publish `packages/roboport/dist` (Release workflow)
 
 ## Stack
 
@@ -46,4 +48,5 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 ## Conventions
 
 - Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`).
+- Add a changeset for user-facing changes to `roboport`; `.changeset/config.json` ignores `@roboport/bot` and `@roboport/docs`.
 - Run `bun run check && bun run typecheck` before committing.
