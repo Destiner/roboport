@@ -1,6 +1,15 @@
 # MCP
 
+Connect Model Context Protocol servers; their tools join the agent's tool set. Presets wrap common servers with the right transport and auth.
+
+Built-in MCP clients:
+
+- Grafana: `Grafana`
+- Linear: `Linear`
+- Tenderly: `Tenderly`
+
 ```ts
+import { Agent } from 'roboport';
 import { Grafana, Linear } from 'roboport/mcp';
 
 const agent = new Agent({
@@ -16,3 +25,46 @@ const agent = new Agent({
 ```
 
 MCP tools are deferred by default and surfaced via `ToolSearch`.
+
+## Custom server
+
+For a server without a preset, use the `Mcp` client with an HTTP or stdio transport. Here is a minimal stdio server exposing four arithmetic tools:
+
+```ts
+// calculator.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+
+const server = new McpServer({ name: 'calculator', version: '0.1.0' });
+const pair = { a: z.number(), b: z.number() };
+const result = (value: number) => ({
+  content: [{ type: 'text', text: String(value) }],
+});
+
+server.tool('add', pair, async ({ a, b }) => result(a + b));
+server.tool('subtract', pair, async ({ a, b }) => result(a - b));
+server.tool('multiply', pair, async ({ a, b }) => result(a * b));
+server.tool('divide', pair, async ({ a, b }) => result(a / b));
+
+await server.connect(new StdioServerTransport());
+```
+
+Point the client at it and add it to the agent:
+
+```ts
+import { Agent } from 'roboport';
+import { Mcp } from 'roboport/mcp';
+
+const calculator = new Mcp({
+  name: 'calculator',
+  transport: { type: 'stdio', command: 'bun', args: ['./calculator.ts'] },
+});
+
+const agent = new Agent({
+  // …
+  mcp: [calculator],
+});
+```
+
+For a remote server, use the `http` transport with `auth` (e.g. `new BearerAuth(token)`). Anything implementing the `McpClient` interface (`connect(): Promise<Tool[]>`, `disconnect()`) also works.

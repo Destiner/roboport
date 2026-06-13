@@ -11,6 +11,8 @@ Composable primitives with sane defaults. Bring your own models, tools, skills; 
 - **Modular**: swap out built-in components or implement custom ones
 - **Batteries included** — harness presets, a built-in skill bundle, and MCP client support
 
+[Docs](https://roboport.up.railway.app)
+
 ## Install
 
 ```sh
@@ -75,6 +77,8 @@ await resumed.send('Continue from here.');
 
 Sessions hold MCP connections for their lifetime, so close them when done (or use `await using`).
 
+[Learn more](https://roboport.up.railway.app/concepts/sessions)
+
 ## Skills
 
 ```ts
@@ -95,6 +99,8 @@ const agent = new Agent({
 
 Skills are lazy-loaded by the model.
 
+[Learn more](https://roboport.up.railway.app/concepts/skills)
+
 ## MCP
 
 ```ts
@@ -113,6 +119,8 @@ const agent = new Agent({
 ```
 
 MCP tools are deferred by default and surfaced via `ToolSearch`.
+
+[Learn more](https://roboport.up.railway.app/concepts/mcp)
 
 ## Triggers
 
@@ -143,6 +151,8 @@ A webhook trigger needs a URL to receive events. Bind the receiver's `handle` to
 app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
 ```
 
+[Learn more](https://roboport.up.railway.app/concepts/triggers)
+
 ## Gateways
 
 A gateway is a two-way connection between a chat transport and an agent: inbound messages run a turn, the reply is relayed back. `serve` wires it up — one long-lived conversation per chat, serialized, with a "typing" indicator and in-memory history by default (swap in `fileStore` to persist).
@@ -153,6 +163,8 @@ import { serve, telegramGateway } from 'roboport/gateways';
 // Long-polling by default
 const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }));
 ```
+
+[Learn more](https://roboport.up.railway.app/concepts/gateways)
 
 ## Status
 

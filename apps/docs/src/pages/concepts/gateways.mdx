@@ -2,6 +2,10 @@
 
 A gateway is a two-way connection between a chat transport (Telegram, Slack, …) and an agent. Where a [trigger](/concepts/triggers) is one-way (it fires an event and forgets), a gateway accepts inbound messages from the **transport** and uses a **reply channel** to relay the answer back.
 
+Built-in gateways:
+
+- Telegram: `telegramGateway`
+
 Use `serve` to bind an agent to a gateway:
 
 ```ts
@@ -33,3 +37,7 @@ await gateway.client.setWebhook(`${publicUrl}${route}`, {
   allowedUpdates: ['message'],
 });
 ```
+
+## Custom gateway
+
+A gateway implements the `Gateway` interface: `open(handler)` wires the transport and returns an unsubscribe (mirroring a trigger's `start`), `handle?(req)` is present for webhook transports the host mounts in an HTTP server, and `relay?` sets the default reply strategy. Each inbound message arrives with a `Channel` carrying `send(text)` and an optional `thinking()` presence indicator. `telegramGateway` is the reference implementation.
