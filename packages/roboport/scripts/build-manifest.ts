@@ -8,23 +8,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(here, '..');
 const distDir = resolve(packageDir, 'dist');
 
-const subpaths = [
-  'gateways',
-  'harness',
-  'mcp',
-  'models',
-  'skills',
-  'triggers',
-] as const;
-
-const exportsField: Record<string, { types: string; import: string }> = {
-  '.': { types: './index.d.ts', import: './index.js' },
-};
-for (const sp of subpaths) {
-  exportsField[`./${sp}`] = {
-    types: `./${sp}/index.d.ts`,
-    import: `./${sp}/index.js`,
-  };
+// Derive the dist exports from the source `exports` map: `./src/x/index.ts` ->
+// `{ types: ./x/index.d.ts, import: ./x/index.js }`. package.json keeps the
+// single source of truth for the subpath list.
+const exportsField: Record<string, { types: string; import: string }> = {};
+for (const [key, srcPath] of Object.entries(pkg.exports)) {
+  const base = srcPath.replace(/^\.\/src\//, './').replace(/\.ts$/, '');
+  exportsField[key] = { types: `${base}.d.ts`, import: `${base}.js` };
 }
 
 const source = pkg as Record<string, unknown>;
