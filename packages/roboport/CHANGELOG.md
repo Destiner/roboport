@@ -1,5 +1,11 @@
 # roboport
 
+## 0.3.0
+
+### Minor Changes
+
+- [#58](https://github.com/Destiner/roboport/pull/58) [`1cfae89`](https://github.com/Destiner/roboport/commit/1cfae89a2a0f8b9712741de8d0204edaf752e721) Thanks [@Destiner](https://github.com/Destiner)! - Rename model adapter classes to drop the `Model` suffix: `AnthropicModel` → `Anthropic`, `OpenAIModel` → `OpenAI`, `GeminiModel` → `Gemini`, `MoonshotModel` → `Moonshot`, and `OpenAICompatibleModel` → `OpenAICompatible`. Update imports from `roboport/models` accordingly.
+
 ## 0.2.0
 
 ### Minor Changes
