@@ -36,6 +36,8 @@ type OAuthAuthOptions = {
   redirectPort?: number;
   scopes?: string[];
   flowTimeoutMs?: number;
+  // Pre-registered client id, for servers without dynamic client registration.
+  clientId?: string;
 };
 
 const DEFAULT_PORT = 33418;
@@ -48,6 +50,7 @@ class OAuthAuth implements AuthProvider {
   private redirectPort: number;
   private scopes?: string[];
   private flowTimeoutMs: number;
+  private clientId?: string;
   private tokens?: TokenSet;
   private loaded = false;
   private metadata?: AuthorizationServerMetadata;
@@ -60,6 +63,7 @@ class OAuthAuth implements AuthProvider {
     this.redirectPort = opts.redirectPort ?? DEFAULT_PORT;
     this.scopes = opts.scopes;
     this.flowTimeoutMs = opts.flowTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.clientId = opts.clientId;
   }
 
   async getHeader(): Promise<string> {
@@ -130,11 +134,11 @@ class OAuthAuth implements AuthProvider {
     const redirectUri =
       this.tokens?.redirectUri ??
       `http://127.0.0.1:${this.redirectPort}/callback`;
-    let clientId = this.tokens?.clientId;
+    let clientId = this.tokens?.clientId ?? this.clientId;
     if (!clientId) {
       if (!meta.registration_endpoint) {
         throw new Error(
-          'OAuth server does not support dynamic client registration; provide a client_id manually.',
+          'OAuth server does not support dynamic client registration; pass a clientId.',
         );
       }
       clientId = await registerClient(meta.registration_endpoint, redirectUri);
