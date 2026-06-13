@@ -3,10 +3,6 @@ import { Agent, Session, type Message, type TextPart, type Turn } from '@/core';
 import type { Channel, Gateway, InboundMessage, Relay } from './core';
 import { memoryStore, type ConversationStore } from './store';
 
-// Every default is a seam: start from `serve(agent, gateway)` and override only
-// what you need. Returning `null` from `prompt` skips the turn (e.g. to handle a
-// command yourself); `context` selects what the model sees this turn (default:
-// the full stored history); `systemExtension` is appended to `agent.system`.
 interface ServeOptions<In extends InboundMessage, Ch extends Channel> {
   conversation?: (message: In) => string;
   authorize?: (message: In, channel: Ch) => boolean | Promise<boolean>;
@@ -20,8 +16,6 @@ interface ServeOptions<In extends InboundMessage, Ch extends Channel> {
 
 interface GatewayRuntime {
   stop(): Promise<void>;
-  // Always present so webhook callers can mount it without a null check; in
-  // non-webhook (e.g. polling) transports it responds 404.
   handle(req: Request): Promise<Response>;
 }
 
