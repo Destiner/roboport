@@ -1,6 +1,7 @@
 import { Tool, type McpClient } from '@/core';
 
 import { BearerAuth, type AuthProvider } from '../auth';
+import { validateMcpName } from '../core';
 
 type Options = {
   url: string;
@@ -191,6 +192,7 @@ class Mcp implements McpClient {
     this.baseUrl = opts.url.replace(/\/$/, '');
     this.auth = new BearerAuth(opts.serviceAccountToken);
     this.nameSpace = opts.name ?? 'grafana';
+    validateMcpName(this.nameSpace);
     this.deferred = opts.deferred ?? true;
   }
 
