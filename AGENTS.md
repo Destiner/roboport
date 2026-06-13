@@ -29,7 +29,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/models/` - `Model` adapters; OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
   - `src/gateways/` - Gateway primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
-  - `src/harness/` - `Harness` bundle, Claude Code/Codex/Pi presets, and standalone, reusable tools in `tools.ts` (file and shell tools delegate to the `shared.ts` helpers)
+  - `src/harness/` - `Harness` bundle, presets, and reusable tools in `tools.ts` (file and shell tools delegate to the `shared.ts` helpers)
   - `src/skills/` - Opt-in skill bundle; each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitive: `cron`, webhook receivers, and the Telegram Bot API client
   - `examples/` - Standalone usage examples
