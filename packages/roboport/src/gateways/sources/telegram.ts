@@ -131,7 +131,9 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
   ): void {
     void Promise.resolve(
       handler(toInbound(message), channelFor(message)),
-    ).catch(() => {});
+    ).catch((error: unknown) => {
+      console.error('[gateways] telegram handler error:', error);
+    });
   }
 
   if (transport.mode === 'webhook') {

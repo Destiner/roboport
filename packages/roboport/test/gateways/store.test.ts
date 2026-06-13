@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -73,7 +73,10 @@ describe('fileStore', () => {
   test('skips malformed lines rather than failing the load', async () => {
     const store = fileStore(dir);
     await store.append('7', user('hi'));
-    await writeFile(join(dir, '7.jsonl'), 'not json\n', { flag: 'a' });
+    // Append into the file the store actually reads (name includes a hash).
+    const [file] = await readdir(dir);
+    if (!file) throw new Error('expected a store file');
+    await writeFile(join(dir, file), 'not json\n', { flag: 'a' });
     await store.append('7', assistant('hello'));
 
     expect(await store.load('7')).toEqual([user('hi'), assistant('hello')]);
