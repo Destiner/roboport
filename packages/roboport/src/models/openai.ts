@@ -13,7 +13,7 @@ import { readSse } from '@/core/stream';
 import { env } from '@/env';
 
 import { OpenAICodexAuth } from './openai-codex-auth';
-import { OpenAICompatibleModel } from './openai-compatible';
+import { OpenAICompatible } from './openai-compatible';
 
 const OPENAI_MODELS = [
   'gpt-5.5',
@@ -30,14 +30,14 @@ type OpenAIApiKeyAuthOptions = {
   apiKey?: string;
 };
 
-type OpenAICodexAuthModelOptions = {
+type OpenAICodexAuthOptions = {
   type: 'codex';
   authFile?: string;
 };
 
-type OpenAIAuthOptions = OpenAIApiKeyAuthOptions | OpenAICodexAuthModelOptions;
+type OpenAIAuthOptions = OpenAIApiKeyAuthOptions | OpenAICodexAuthOptions;
 
-type OpenAIModelOptions = {
+type OpenAIOptions = {
   auth?: OpenAIAuthOptions;
   baseUrl?: string;
   thinking?: ThinkingLevel;
@@ -236,10 +236,10 @@ function mapResponsesStatus(status: string | undefined): StopReason {
   }
 }
 
-class OpenAIModel extends OpenAICompatibleModel {
+class OpenAI extends OpenAICompatible {
   private codexAuth?: OpenAICodexAuth;
 
-  constructor(modelName: OpenAIModelName, options?: OpenAIModelOptions) {
+  constructor(modelName: OpenAIModelName, options?: OpenAIOptions) {
     const auth = options?.auth ?? { type: 'apiKey' };
     const key: string =
       auth.type === 'apiKey' ? (auth.apiKey ?? env.openaiApiKey ?? '') : '';
@@ -686,9 +686,4 @@ function extractSearchHits(json: ResponsesJson): SearchHit[] {
   return hits;
 }
 
-export {
-  OpenAIModel,
-  OPENAI_MODELS,
-  type OpenAIAuthOptions,
-  type OpenAIModelOptions,
-};
+export { OpenAI, OPENAI_MODELS, type OpenAIAuthOptions, type OpenAIOptions };

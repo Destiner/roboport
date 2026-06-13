@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Agent } from '@/core';
 import { fileStore, serve, stream, telegramGateway } from '@/gateways';
 import { claudeCode } from '@/harness';
-import { AnthropicModel } from '@/models';
+import { Anthropic } from '@/models';
 
 // A personal Telegram assistant: per-chat memory, a persona it maintains itself,
 // a bounded context window, and streamed replies. A trimmed-down take on a real
@@ -17,7 +17,7 @@ const ownerIds = (process.env.ALLOWED_USER_IDS ?? '')
   .filter(Boolean);
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
+  model: new Anthropic('claude-opus-4-8', { thinking: 'medium' }),
   system: claudeCode.system,
   tools: claudeCode.tools,
   skills: [],

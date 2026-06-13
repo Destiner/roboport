@@ -24,12 +24,12 @@ bun add roboport zod
 ```ts
 import { Agent } from 'roboport';
 import { claudeCode } from 'roboport/harness';
-import { AnthropicModel } from 'roboport/models';
+import { Anthropic } from 'roboport/models';
 import { prReview } from 'roboport/skills';
 import { github } from 'roboport/triggers';
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
+  model: new Anthropic('claude-opus-4-8', { thinking: 'medium' }),
   system: claudeCode.system,
   tools: claudeCode.tools,
   skills: [prReview],

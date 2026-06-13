@@ -1,15 +1,15 @@
-import { ANTHROPIC_MODELS, AnthropicModel } from './anthropic';
-import { GEMINI_MODELS, GeminiModel } from './google';
-import { MOONSHOT_MODELS, MoonshotModel } from './moonshot';
-import { OPENAI_MODELS, OpenAIModel } from './openai';
-import { OpenAICompatibleModel } from './openai-compatible';
+import { ANTHROPIC_MODELS, Anthropic } from './anthropic';
+import { GEMINI_MODELS, Gemini } from './google';
+import { MOONSHOT_MODELS, Moonshot } from './moonshot';
+import { OPENAI_MODELS, OpenAI } from './openai';
+import { OpenAICompatible } from './openai-compatible';
 
 export {
-  AnthropicModel,
-  GeminiModel,
-  MoonshotModel,
-  OpenAIModel,
-  OpenAICompatibleModel,
+  Anthropic,
+  Gemini,
+  Moonshot,
+  OpenAI,
+  OpenAICompatible,
   ANTHROPIC_MODELS,
   GEMINI_MODELS,
   MOONSHOT_MODELS,

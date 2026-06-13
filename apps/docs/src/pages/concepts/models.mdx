@@ -4,23 +4,23 @@ A model adapter turns a provider's API into the framework's streaming interface.
 
 Built-in adapters:
 
-- Anthropic: `AnthropicModel`
-- OpenAI: `OpenAIModel`
-- Google Gemini: `GeminiModel`
-- Moonshot: `MoonshotModel`
-- OpenAI-compatible: `OpenAICompatibleModel`
+- Anthropic: `Anthropic`
+- OpenAI: `OpenAI`
+- Google Gemini: `Gemini`
+- Moonshot: `Moonshot`
+- OpenAI-compatible: `OpenAICompatible`
 
 ```ts
 import { Agent } from 'roboport';
-import { AnthropicModel } from 'roboport/models';
+import { Anthropic } from 'roboport/models';
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
+  model: new Anthropic('claude-opus-4-8', { thinking: 'medium' }),
   // …
 });
 ```
 
-`OpenAICompatibleModel` targets any OpenAI-shaped endpoint via `baseUrl`. Thinking levels are unified across providers — `off | minimal | low | medium | high | xhigh` — and each adapter maps them onto its own wire format.
+`OpenAICompatible` targets any OpenAI-shaped endpoint via `baseUrl`. Thinking levels are unified across providers — `off | minimal | low | medium | high | xhigh` — and each adapter maps them onto its own wire format.
 
 ## Custom model
 

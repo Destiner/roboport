@@ -1,12 +1,12 @@
 import { Agent } from '@/core';
 import { claudeCode } from '@/harness';
-import { AnthropicModel } from '@/models';
+import { Anthropic } from '@/models';
 import { codeSimplifier } from '@/skills';
 
 import { logEvents, logMessages } from './common';
 
 const agent = new Agent({
-  model: new AnthropicModel('claude-opus-4-7'),
+  model: new Anthropic('claude-opus-4-7'),
   system: claudeCode.system,
   tools: claudeCode.tools,
   skills: [codeSimplifier],

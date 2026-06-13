@@ -86,7 +86,7 @@ function parseToolArguments(raw: string): unknown {
   }
 }
 
-abstract class OpenAICompatibleModel extends Model {
+abstract class OpenAICompatible extends Model {
   modelName: string;
   apiKey: string;
   baseUrl: string;
@@ -328,4 +328,4 @@ abstract class OpenAICompatibleModel extends Model {
   }
 }
 
-export { OpenAICompatibleModel, type OpenAIAssistantWireMessage };
+export { OpenAICompatible, type OpenAIAssistantWireMessage };
