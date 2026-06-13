@@ -1,5 +1,6 @@
 import { dispatch, makeBus, subscribe } from '../bus';
 import type { Trigger } from '../core';
+import { SeenCache, timingSafeEqual } from '../shared';
 
 interface TelegramUser {
   id: number;
@@ -74,41 +75,6 @@ const TELEGRAM_API_BASE = 'https://api.telegram.org';
 // Telegram caps message text at 4096 UTF-16 code units.
 const MAX_MESSAGE_LENGTH = 4096;
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-// FIFO set of seen update_ids. Telegram retries any non-2xx delivery, so the
-// receiver must drop replays it has already dispatched.
-class UpdateCache {
-  private seen = new Set<number>();
-  private order: number[] = [];
-  private readonly maxSize: number;
-
-  constructor(maxSize: number) {
-    this.maxSize = maxSize;
-  }
-
-  has(id: number): boolean {
-    return this.seen.has(id);
-  }
-
-  add(id: number): void {
-    if (this.seen.has(id)) return;
-    this.seen.add(id);
-    this.order.push(id);
-    while (this.order.length > this.maxSize) {
-      const dropped = this.order.shift();
-      if (dropped !== undefined) this.seen.delete(dropped);
-    }
-  }
-}
-
 function matchesCommand(
   message: TelegramMessage,
   commands: string[],
@@ -135,14 +101,14 @@ class TelegramReceiver {
   private messageBus = makeBus<TelegramMessage>();
   private editedMessageBus = makeBus<TelegramMessage>();
   private readonly secretToken: string;
-  private readonly updates: UpdateCache;
+  private readonly updates: SeenCache<number>;
 
   constructor(options: TelegramReceiverOptions) {
     if (!options.secretToken) {
       throw new Error('TelegramReceiver requires a non-empty secretToken');
     }
     this.secretToken = options.secretToken;
-    this.updates = new UpdateCache(
+    this.updates = new SeenCache(
       options.updateCacheSize ?? DEFAULT_UPDATE_CACHE_SIZE,
     );
   }

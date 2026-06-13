@@ -8,7 +8,9 @@ Built-in triggers:
 - GitHub: `github`
 - Grafana: `grafana`
 - Linear: `linear`
+- Slack: `slack`
 - Telegram: `telegram`
+- Webhook: `webhook` (generic JSON receiver for sources without a preset)
 
 ```ts
 import { cron, github } from 'roboport/triggers';
@@ -33,6 +35,46 @@ A webhook trigger needs a URL to receive events. Bind the receiver's `handle` to
 
 ```ts
 app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
+```
+
+`slack` is an Events API receiver — it verifies the request signature, answers
+the setup challenge, and exposes `appMention`, `message`, and `reaction`:
+
+```ts
+import { slack } from 'roboport/triggers';
+
+const sl = slack({ signingSecret: process.env.SLACK_SIGNING_SECRET });
+agent.on(sl.appMention(), async (event) => {
+  await using session = agent.session();
+  await session.send(`Mentioned in ${event.channel}: ${event.text}`);
+});
+
+app.post('/webhooks/slack', (c) => sl.handle(c.req.raw));
+```
+
+For a source without a dedicated preset, `webhook` parses JSON deliveries into
+`{ body, headers }`, with optional HMAC verification and id-based dedup. Pass a
+type argument to `event<T>()` to type `body` without casting in the handler:
+
+```ts
+import { webhook } from 'roboport/triggers';
+
+interface DeployHook {
+  kind: string;
+}
+
+// Omit `secret` for an unsigned receiver; passing it empty throws, so a missing
+// env var fails fast instead of silently disabling verification.
+const hook = webhook({ secret: process.env.WEBHOOK_SECRET });
+agent.on(
+  hook.event<DeployHook>({ filter: (e) => e.body.kind === 'deploy' }),
+  async ({ body }) => {
+    await using session = agent.session();
+    await session.send(`Deploy event: ${JSON.stringify(body)}`);
+  },
+);
+
+app.post('/webhooks/custom', (c) => hook.handle(c.req.raw));
 ```
 
 ## Custom trigger

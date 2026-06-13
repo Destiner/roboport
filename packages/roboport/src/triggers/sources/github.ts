@@ -1,5 +1,6 @@
 import { dispatch, makeBus, subscribe } from '../bus';
 import type { Trigger } from '../core';
+import { hmacSha256Hex, SeenCache, timingSafeEqual } from '../shared';
 
 interface GithubUser {
   login: string;
@@ -130,15 +131,6 @@ interface GithubReceiverOptions {
 
 const DEFAULT_DELIVERY_CACHE_SIZE = 1024;
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
 async function verifySignature(
   secret: string,
   body: string,
@@ -149,48 +141,8 @@ async function verifySignature(
   if (!signatureHeader.startsWith(prefix)) return false;
   const provided = signatureHeader.slice(prefix.length).toLowerCase();
   if (!/^[0-9a-f]+$/.test(provided)) return false;
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const computedBytes = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(body),
-  );
-  const computed = Array.from(new Uint8Array(computedBytes))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
+  const computed = await hmacSha256Hex(secret, body);
   return timingSafeEqual(provided, computed);
-}
-
-class DeliveryCache {
-  private seen = new Set<string>();
-  private order: string[] = [];
-  private readonly maxSize: number;
-
-  constructor(maxSize: number) {
-    this.maxSize = maxSize;
-  }
-
-  has(id: string): boolean {
-    return this.seen.has(id);
-  }
-
-  add(id: string): void {
-    if (this.seen.has(id)) return;
-    this.seen.add(id);
-    this.order.push(id);
-    while (this.order.length > this.maxSize) {
-      const dropped = this.order.shift();
-      if (dropped !== undefined) this.seen.delete(dropped);
-    }
-  }
 }
 
 class GithubReceiver {
@@ -200,14 +152,14 @@ class GithubReceiver {
   private issuesBus = makeBus<IssuesEvent>();
   private pushBus = makeBus<PushEvent>();
   private readonly secret: string;
-  private readonly deliveries: DeliveryCache;
+  private readonly deliveries: SeenCache<string>;
 
   constructor(options: GithubReceiverOptions) {
     if (!options.secret) {
       throw new Error('GithubReceiver requires a non-empty secret');
     }
     this.secret = options.secret;
-    this.deliveries = new DeliveryCache(
+    this.deliveries = new SeenCache(
       options.deliveryCacheSize ?? DEFAULT_DELIVERY_CACHE_SIZE,
     );
   }

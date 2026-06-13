@@ -29,6 +29,19 @@ import {
   type LinearProjectEvent,
 } from './sources/linear';
 import {
+  slack,
+  SlackApiError,
+  SlackClient,
+  SlackReceiver,
+  type SlackAppMentionEvent,
+  type SlackEventContext,
+  type SlackMessageEvent,
+  type SlackPostMessageResult,
+  type SlackReactionAction,
+  type SlackReactionEvent,
+  type SlackReceiverOptions,
+} from './sources/slack';
+import {
   telegram,
   TelegramClient,
   TelegramReceiver,
@@ -42,6 +55,12 @@ import {
   type TelegramUpdate,
   type TelegramUser,
 } from './sources/telegram';
+import {
+  webhook,
+  WebhookReceiver,
+  type WebhookEvent,
+  type WebhookReceiverOptions,
+} from './sources/webhook';
 
 export {
   cron,
@@ -51,11 +70,17 @@ export {
   GrafanaReceiver,
   linear,
   LinearReceiver,
+  slack,
+  SlackApiError,
+  SlackClient,
+  SlackReceiver,
   splitMessage,
   telegram,
   TelegramClient,
   TelegramReceiver,
   trigger,
+  webhook,
+  WebhookReceiver,
   type CronEvent,
   type Emit,
   type GithubReviewComment,
@@ -70,6 +95,13 @@ export {
   type PushEvent,
   type SendMessageDraftOptions,
   type SendMessageOptions,
+  type SlackAppMentionEvent,
+  type SlackEventContext,
+  type SlackMessageEvent,
+  type SlackPostMessageResult,
+  type SlackReactionAction,
+  type SlackReactionEvent,
+  type SlackReceiverOptions,
   type TelegramChat,
   type TelegramChatAction,
   type TelegramMessage,
@@ -79,4 +111,6 @@ export {
   type Trigger,
   type TriggerHandler,
   type Unsub,
+  type WebhookEvent,
+  type WebhookReceiverOptions,
 };
