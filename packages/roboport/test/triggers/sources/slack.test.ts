@@ -10,6 +10,7 @@ import {
 
 import {
   slack,
+  SlackApiError,
   SlackClient,
   type SlackAppMentionEvent,
   type SlackMessageEvent,
@@ -280,7 +281,7 @@ describe('SlackClient', () => {
     expect(params.get('thread_ts')).toBe('1.1');
   });
 
-  test('throws when Slack reports ok: false', async () => {
+  test('throws a SlackApiError carrying the error code on ok: false', async () => {
     spyOn(globalThis, 'fetch').mockImplementation(
       (async () =>
         new Response(
@@ -289,8 +290,26 @@ describe('SlackClient', () => {
     );
 
     const client = new SlackClient('xoxb-token');
-    await expect(client.postMessage('C1', 'hi')).rejects.toThrow(
-      'channel_not_found',
+    const err = await client.postMessage('C1', 'hi').catch((e) => e);
+    expect(err).toBeInstanceOf(SlackApiError);
+    expect(err.code).toBe('channel_not_found');
+    expect(err.status).toBe(200);
+  });
+
+  test('surfaces Retry-After as a rate_limited SlackApiError on HTTP 429', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response('', {
+          status: 429,
+          headers: { 'retry-after': '30' },
+        })) as never,
     );
+
+    const client = new SlackClient('xoxb-token');
+    const err = await client.postMessage('C1', 'hi').catch((e) => e);
+    expect(err).toBeInstanceOf(SlackApiError);
+    expect(err.code).toBe('rate_limited');
+    expect(err.status).toBe(429);
+    expect(err.retryAfter).toBe(30);
   });
 });

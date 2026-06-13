@@ -1,9 +1,9 @@
 import { dispatch, makeBus, subscribe } from '../bus';
-import type { Trigger } from '../core';
+import type { Emit, Trigger } from '../core';
 import { hmacSha256Hex, SeenCache, timingSafeEqual } from '../shared';
 
-interface WebhookEvent {
-  body: unknown;
+interface WebhookEvent<T = unknown> {
+  body: T;
   headers: Record<string, string>;
 }
 
@@ -30,6 +30,14 @@ class WebhookReceiver {
   private readonly deliveries: SeenCache<string>;
 
   constructor(options?: WebhookReceiverOptions) {
+    // Omitting `secret` is a valid unsigned receiver, but providing it empty
+    // (e.g. `secret: process.env.WEBHOOK_SECRET` with the var unset) almost
+    // always means signing was intended — fail fast rather than run unsigned.
+    if (options && 'secret' in options && !options.secret) {
+      throw new Error(
+        'WebhookReceiver: `secret` was provided but is empty; omit it for an unsigned receiver or pass a non-empty secret',
+      );
+    }
     this.secret = options?.secret;
     this.signatureHeader = options?.signatureHeader ?? 'x-hub-signature-256';
     this.signaturePrefix = options?.signaturePrefix ?? 'sha256=';
@@ -39,14 +47,18 @@ class WebhookReceiver {
     );
   }
 
-  event(opts?: {
-    filter?: (event: WebhookEvent) => boolean;
-  }): Trigger<WebhookEvent> {
+  event<T = unknown>(opts?: {
+    filter?: (event: WebhookEvent<T>) => boolean;
+  }): Trigger<WebhookEvent<T>> {
     const bus = this.bus;
-    const filter = opts?.filter;
+    // The bus is untyped over the body; narrow at the subscription boundary so
+    // callers get `WebhookEvent<T>` without an inline cast in the handler.
+    const filter = opts?.filter as
+      | ((event: WebhookEvent) => boolean)
+      | undefined;
     return {
       name: 'webhook',
-      start: (emit) => subscribe(bus, emit, filter),
+      start: (emit) => subscribe(bus, emit as Emit<WebhookEvent>, filter),
     };
   }
 

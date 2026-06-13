@@ -53,14 +53,21 @@ app.post('/webhooks/slack', (c) => sl.handle(c.req.raw));
 ```
 
 For a source without a dedicated preset, `webhook` parses JSON deliveries into
-`{ body, headers }`, with optional HMAC verification and id-based dedup:
+`{ body, headers }`, with optional HMAC verification and id-based dedup. Pass a
+type argument to `event<T>()` to type `body` without casting in the handler:
 
 ```ts
 import { webhook } from 'roboport/triggers';
 
+interface DeployHook {
+  kind: string;
+}
+
+// Omit `secret` for an unsigned receiver; passing it empty throws, so a missing
+// env var fails fast instead of silently disabling verification.
 const hook = webhook({ secret: process.env.WEBHOOK_SECRET });
 agent.on(
-  hook.event({ filter: (e) => (e.body as { kind: string }).kind === 'deploy' }),
+  hook.event<DeployHook>({ filter: (e) => e.body.kind === 'deploy' }),
   async ({ body }) => {
     await using session = agent.session();
     await session.send(`Deploy event: ${JSON.stringify(body)}`);

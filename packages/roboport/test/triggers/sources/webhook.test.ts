@@ -92,18 +92,26 @@ describe('WebhookReceiver.handle', () => {
     expect(events).toHaveLength(1);
   });
 
-  test('applies the subscription filter', async () => {
+  test('applies the subscription filter with a typed body', async () => {
     const receiver = webhook();
-    const events: WebhookEvent[] = [];
+    const events: WebhookEvent<{ kind: string }>[] = [];
     receiver
-      .event({ filter: (e) => (e.body as { kind: string }).kind === 'deploy' })
+      .event<{ kind: string }>({ filter: (e) => e.body.kind === 'deploy' })
       .start((e) => events.push(e));
 
     await receiver.handle(makeRequest(JSON.stringify({ kind: 'ping' })));
     await receiver.handle(makeRequest(JSON.stringify({ kind: 'deploy' })));
 
     expect(events).toHaveLength(1);
-    expect((events[0]?.body as { kind: string }).kind).toBe('deploy');
+    expect(events[0]?.body.kind).toBe('deploy');
+  });
+
+  test('throws when secret is provided but empty', () => {
+    expect(() => webhook({ secret: undefined })).toThrow('was provided');
+    expect(() => webhook({ secret: '' })).toThrow('was provided');
+    // No `secret` key at all is a valid unsigned receiver.
+    expect(() => webhook({ idHeader: 'x-delivery' })).not.toThrow();
+    expect(() => webhook()).not.toThrow();
   });
 
   test('dedups retries on the configured id header', async () => {

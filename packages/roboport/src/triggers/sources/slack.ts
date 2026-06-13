@@ -218,6 +218,31 @@ interface SlackPostMessageResult {
   ts: string;
 }
 
+// Carries the stable Slack `error` code so callers (and a future gateway) can
+// branch on `channel_not_found` vs. retryable throttling without parsing the
+// message. On HTTP 429 `code` is `rate_limited` and `retryAfter` is the
+// `Retry-After` delay in seconds.
+class SlackApiError extends Error {
+  readonly method: string;
+  readonly code: string;
+  readonly status: number;
+  readonly retryAfter?: number;
+
+  constructor(opts: {
+    method: string;
+    code: string;
+    status: number;
+    retryAfter?: number;
+  }) {
+    super(`Slack ${opts.method} failed (${opts.status}): ${opts.code}`);
+    this.name = 'SlackApiError';
+    this.method = opts.method;
+    this.code = opts.code;
+    this.status = opts.status;
+    this.retryAfter = opts.retryAfter;
+  }
+}
+
 // Outbound Web API client. Colocated with the receiver so a Slack app (or a
 // future gateway) can reply, stream-edit, react, and link back without pulling
 // in the MCP preset.
@@ -248,12 +273,25 @@ class SlackClient {
       },
       body,
     });
-    // Slack returns HTTP 200 with `{ ok: false, error }` for API-level failures.
+    // Throttling: Slack sends HTTP 429 with a `Retry-After` (seconds) header.
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get('retry-after'));
+      throw new SlackApiError({
+        method,
+        code: 'rate_limited',
+        status: 429,
+        retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined,
+      });
+    }
+    // Otherwise Slack returns HTTP 200 with `{ ok: false, error }` for
+    // API-level failures.
     const data = (await res.json()) as { ok: boolean; error?: string } & T;
     if (!data.ok) {
-      throw new Error(
-        `Slack ${method} failed (${res.status}): ${data.error ?? 'unknown error'}`,
-      );
+      throw new SlackApiError({
+        method,
+        code: data.error ?? 'unknown_error',
+        status: res.status,
+      });
     }
     return data;
   }
@@ -302,6 +340,7 @@ function slack(options: SlackReceiverOptions): SlackReceiver {
 
 export {
   slack,
+  SlackApiError,
   SlackClient,
   SlackReceiver,
   type SlackAppMentionEvent,

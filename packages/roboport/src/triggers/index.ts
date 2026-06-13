@@ -30,6 +30,7 @@ import {
 } from './sources/linear';
 import {
   slack,
+  SlackApiError,
   SlackClient,
   SlackReceiver,
   type SlackAppMentionEvent,
@@ -70,6 +71,7 @@ export {
   linear,
   LinearReceiver,
   slack,
+  SlackApiError,
   SlackClient,
   SlackReceiver,
   splitMessage,
