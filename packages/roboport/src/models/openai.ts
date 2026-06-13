@@ -30,14 +30,14 @@ type OpenAIApiKeyAuthOptions = {
   apiKey?: string;
 };
 
-type OpenAICodexAuthModelOptions = {
+type OpenAICodexAuthOptions = {
   type: 'codex';
   authFile?: string;
 };
 
-type OpenAIAuthOptions = OpenAIApiKeyAuthOptions | OpenAICodexAuthModelOptions;
+type OpenAIAuthOptions = OpenAIApiKeyAuthOptions | OpenAICodexAuthOptions;
 
-type OpenAIModelOptions = {
+type OpenAIOptions = {
   auth?: OpenAIAuthOptions;
   baseUrl?: string;
   thinking?: ThinkingLevel;
@@ -239,7 +239,7 @@ function mapResponsesStatus(status: string | undefined): StopReason {
 class OpenAI extends OpenAICompatible {
   private codexAuth?: OpenAICodexAuth;
 
-  constructor(modelName: OpenAIModelName, options?: OpenAIModelOptions) {
+  constructor(modelName: OpenAIModelName, options?: OpenAIOptions) {
     const auth = options?.auth ?? { type: 'apiKey' };
     const key: string =
       auth.type === 'apiKey' ? (auth.apiKey ?? env.openaiApiKey ?? '') : '';
@@ -686,9 +686,4 @@ function extractSearchHits(json: ResponsesJson): SearchHit[] {
   return hits;
 }
 
-export {
-  OpenAI,
-  OPENAI_MODELS,
-  type OpenAIAuthOptions,
-  type OpenAIModelOptions,
-};
+export { OpenAI, OPENAI_MODELS, type OpenAIAuthOptions, type OpenAIOptions };
