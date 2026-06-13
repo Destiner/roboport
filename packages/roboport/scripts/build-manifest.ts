@@ -50,7 +50,8 @@ await writeFile(
 );
 
 // Carry the README and license into the package so npm renders them on the
-// package page; LICENSE is optional today (the manifest declares UNLICENSED).
+// package page. LICENSE is a symlink to the repo root; copyFile dereferences
+// it, so the packed file is the real MIT text.
 for (const file of ['README.md', 'LICENSE']) {
   const from = resolve(packageDir, file);
   try {
