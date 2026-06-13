@@ -145,7 +145,7 @@ app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
 
 ## Gateways
 
-A gateway is a two-way connection between a chat transport and an agent: inbound messages run a turn, the reply is relayed back. `serve` wires it up — one long-lived conversation per chat, serialized, with a "typing" indicator and durable history.
+A gateway is a two-way connection between a chat transport and an agent: inbound messages run a turn, the reply is relayed back. `serve` wires it up — one long-lived conversation per chat, serialized, with a "typing" indicator and in-memory history by default (swap in `fileStore` to persist).
 
 ```ts
 import { serve, telegramGateway } from 'roboport/gateways';
