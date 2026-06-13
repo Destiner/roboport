@@ -21,6 +21,8 @@ interface TelegramChat {
 
 interface TelegramMessage {
   message_id: number;
+  // Forum supergroups (and threaded replies): the topic this message belongs to.
+  message_thread_id?: number;
   from?: TelegramUser;
   chat: TelegramChat;
   date: number;

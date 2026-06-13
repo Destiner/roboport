@@ -62,6 +62,14 @@ describe('fileStore', () => {
     expect(await store.load('-100/../etc')).toEqual([user('hi')]);
   });
 
+  test('does not merge ids that share a sanitized prefix', async () => {
+    const store = fileStore(dir);
+    await store.append('a/b', user('slash'));
+    await store.append('a:b', user('colon'));
+    expect(await store.load('a/b')).toEqual([user('slash')]);
+    expect(await store.load('a:b')).toEqual([user('colon')]);
+  });
+
   test('skips malformed lines rather than failing the load', async () => {
     const store = fileStore(dir);
     await store.append('7', user('hi'));
