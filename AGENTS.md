@@ -41,7 +41,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 - Tools accept either a Zod `inputSchema` or a raw `jsonSchema`; the `Tool` constructor has overloads for both (`packages/roboport/src/core/tool.ts`).
 - `roboport` keeps Zod as a peer dependency, so workspace consumers that define Zod-backed tools list `zod` in their own dependencies (`packages/roboport/package.json`).
 - Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `packages/roboport/src/core/tool.ts`.
-- Agents and sessions can set `cwd` to scope a run to a workspace; built-in harness shell/search tools default to `ToolContext.cwd` (`packages/roboport/src/core/agent.ts`, `packages/roboport/src/core/tool.ts`).
+- Agents and sessions can set `cwd` to scope a run to a workspace, and `agent.session({ systemExtension })` appends per-session instructions to the system prompt; built-in harness shell/search tools default to `ToolContext.cwd` (`packages/roboport/src/core/agent.ts`, `packages/roboport/src/core/tool.ts`).
 - Trigger handlers registered with `Agent.on` receive the event and call `agent.session().send(...)` when they want to run the agent (`packages/roboport/src/core/agent.ts`).
 - The root `roboport` export re-exports core primitives and message/session/tool registry types from `packages/roboport/src/core/` (`packages/roboport/src/index.ts`).
 - Every `Model` adapter extends the abstract class in `packages/roboport/src/core/model.ts`, implements `streamMessage(...)`, and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 and later use adaptive thinking instead of budget tokens.
