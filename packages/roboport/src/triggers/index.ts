@@ -42,6 +42,12 @@ import {
   type TelegramUpdate,
   type TelegramUser,
 } from './sources/telegram';
+import {
+  webhook,
+  WebhookReceiver,
+  type WebhookEvent,
+  type WebhookReceiverOptions,
+} from './sources/webhook';
 
 export {
   cron,
@@ -56,6 +62,8 @@ export {
   TelegramClient,
   TelegramReceiver,
   trigger,
+  webhook,
+  WebhookReceiver,
   type CronEvent,
   type Emit,
   type GithubReviewComment,
@@ -79,4 +87,6 @@ export {
   type Trigger,
   type TriggerHandler,
   type Unsub,
+  type WebhookEvent,
+  type WebhookReceiverOptions,
 };
