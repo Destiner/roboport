@@ -1,8 +1,34 @@
 # Skills
 
+A skill is a named, described chunk of instructions the model loads on demand.
+
+Built-in skills:
+
+- PR Review: `prReview`
+- Docs Update: `docsUpdate`
+- Public Docs: `publicDocs`
+- Developer Experience: `developerExperience`
+- Code Simplifier: `codeSimplifier`
+
+```ts
+import { Agent } from 'roboport';
+import { prReview, docsUpdate } from 'roboport/skills';
+
+const agent = new Agent({
+  // …
+  skills: [prReview, docsUpdate],
+});
+```
+
+Skills are lazy-loaded: the model sees each `name` and `description`, and pulls in the `content` only when it decides the skill is relevant.
+
+## Custom skill
+
+`content` is the markdown body of the skill's instructions. Define one and pass it alongside the built-ins:
+
 ```ts
 import { Skill } from 'roboport';
-import { prReview, docsUpdate } from 'roboport/skills';
+import { docsUpdate } from 'roboport/skills';
 
 const releaseNotes = new Skill({
   name: 'release-notes',
@@ -16,4 +42,4 @@ const agent = new Agent({
 });
 ```
 
-Skills are lazy-loaded by the model.
+Because `content` is just markdown, you can keep skills as `SKILL.md` files and import the text.

@@ -1,0 +1,47 @@
+# Tools
+
+Tools are the agent's capabilities. A harness preset ships a default set, and each tool is also exported standalone for mixing your own.
+
+Built-in tools:
+
+- Bash: `bash`
+- Read File: `readFile`
+- Write File: `writeFile`
+- Edit File: `editFile`
+- Web Search: `webSearch`
+- Web Fetch: `webFetch`
+
+```ts
+import { Agent } from 'roboport';
+import { bash, readFile, webSearch } from 'roboport/harness';
+
+const agent = new Agent({
+  tools: [bash, readFile, webSearch],
+  // …
+});
+```
+
+Standalone tools default their working directory to the agent's `cwd`.
+
+## Custom tool
+
+A tool is a name, a description, an input schema, and an `execute`. Use a Zod `inputSchema` (validated and converted to JSON Schema for you) or a raw `jsonSchema`:
+
+```ts
+import { Tool } from 'roboport';
+import { z } from 'zod';
+
+const getWeather = new Tool({
+  name: 'get_weather',
+  description: 'Current weather for a city.',
+  inputSchema: z.object({ city: z.string() }),
+  execute: async ({ city }) => {
+    const res = await fetch(`https://api.example.com/weather?q=${city}`);
+    return res.text();
+  },
+});
+```
+
+`execute` receives the parsed input and a `ToolContext` (`complete`, `searchWeb`, `session`, `tools`, `cwd`). Set `deferred: true` to keep a tool out of the initial set — it is surfaced to the model through tool search and loaded on demand.
+
+`zod` is a peer dependency, so list it in your own dependencies when defining Zod-backed tools.

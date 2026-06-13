@@ -9,6 +9,9 @@ export default defineConfig({
       text: 'Concepts',
       items: [
         { text: 'Sessions', link: '/concepts/sessions' },
+        { text: 'Models', link: '/concepts/models' },
+        { text: 'Tools', link: '/concepts/tools' },
+        { text: 'Harnesses', link: '/concepts/harnesses' },
         { text: 'Skills', link: '/concepts/skills' },
         { text: 'MCP', link: '/concepts/mcp' },
         { text: 'Triggers', link: '/concepts/triggers' },

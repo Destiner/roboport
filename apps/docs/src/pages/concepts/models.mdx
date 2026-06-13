@@ -1,0 +1,57 @@
+# Models
+
+A model adapter turns a provider's API into the framework's streaming interface.
+
+Built-in adapters:
+
+- Anthropic: `AnthropicModel`
+- OpenAI: `OpenAIModel`
+- Google Gemini: `GeminiModel`
+- Moonshot: `MoonshotModel`
+- OpenAI-compatible: `OpenAICompatibleModel`
+
+```ts
+import { Agent } from 'roboport';
+import { AnthropicModel } from 'roboport/models';
+
+const agent = new Agent({
+  model: new AnthropicModel('claude-opus-4-8', { thinking: 'medium' }),
+  // …
+});
+```
+
+`OpenAICompatibleModel` targets any OpenAI-shaped endpoint via `baseUrl`. Thinking levels are unified across providers — `off | minimal | low | medium | high | xhigh` — and each adapter maps them onto its own wire format.
+
+## Custom model
+
+Extend `Model` and implement `streamMessage`; the non-streaming `createMessage` is derived from it for free. `searchWeb` backs the `web_search` tool — return `[]` if the provider has none.
+
+```ts
+import {
+  Model,
+  type CreateMessageParams,
+  type ModelStreamEvent,
+  type SearchHit,
+} from 'roboport';
+
+class EchoModel extends Model {
+  async *streamMessage(
+    params: CreateMessageParams,
+  ): AsyncIterable<ModelStreamEvent> {
+    const last = params.messages.at(-1);
+    const text = typeof last?.content === 'string' ? last.content : '';
+    yield { type: 'text-delta', text };
+    yield { type: 'text-end', text };
+    yield {
+      type: 'message-end',
+      id: 'echo-1',
+      stopReason: 'end_turn',
+      usage: { inputTokens: 0, outputTokens: 0 },
+    };
+  }
+
+  async searchWeb(): Promise<SearchHit[]> {
+    return [];
+  }
+}
+```

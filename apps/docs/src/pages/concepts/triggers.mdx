@@ -2,6 +2,14 @@
 
 A trigger is an event source. The handler decides whether to start the agent.
 
+Built-in triggers:
+
+- Cron: `cron`
+- GitHub: `github`
+- Grafana: `grafana`
+- Linear: `linear`
+- Telegram: `telegram`
+
 ```ts
 import { cron, github } from 'roboport/triggers';
 
@@ -25,4 +33,25 @@ A webhook trigger needs a URL to receive events. Bind the receiver's `handle` to
 
 ```ts
 app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
+```
+
+## Custom trigger
+
+`trigger` builds one from a `start` function that receives an `emit` callback and returns an unsubscribe:
+
+```ts
+import { trigger } from 'roboport/triggers';
+
+const tick = trigger<{ at: number }>({
+  name: 'tick',
+  start(emit) {
+    const id = setInterval(() => emit({ at: Date.now() }), 60_000);
+    return () => clearInterval(id);
+  },
+});
+
+agent.on(tick, async (event) => {
+  await using session = agent.session();
+  await session.send(`Tick at ${event.at}.`);
+});
 ```

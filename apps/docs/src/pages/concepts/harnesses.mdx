@@ -1,0 +1,34 @@
+# Harnesses
+
+A harness bundles a system prompt with a default tool set — the agent's baseline behaviour and capabilities.
+
+Built-in harnesses:
+
+- Claude Code: `claudeCode`
+- Codex: `codex`
+- Pi: `pi`
+
+```ts
+import { Agent } from 'roboport';
+import { claudeCode } from 'roboport/harness';
+
+const agent = new Agent({
+  system: claudeCode.system,
+  tools: claudeCode.tools,
+  // …
+});
+```
+
+## Custom harness
+
+A harness is just a `system` string paired with a `tools` array, so compose your own — optionally extending a preset:
+
+```ts
+import { bash, readFile, webSearch } from 'roboport/harness';
+
+const agent = new Agent({
+  system: 'You are a research assistant. Cite your sources.',
+  tools: [readFile, webSearch],
+  // …
+});
+```
