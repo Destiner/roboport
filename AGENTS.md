@@ -24,10 +24,11 @@ Minimal TypeScript framework for building LLM agents.
 
 Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable services.
 
-- `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `harness`, `mcp`, `models`, `skills`, `triggers`
+- `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `gateways`, `harness`, `mcp`, `models`, `skills`, `triggers`
   - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` / `Session` primitives, plus provider-agnostic message and stream event types
   - `src/models/` - `Model` adapters (Anthropic, Google, Moonshot, OpenAI, OpenAI-compatible); OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
+  - `src/gateways/` - Gateway primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
   - `src/harness/` - `Harness` bundle, Claude Code/Codex/Pi presets, and standalone, reusable tools in `tools.ts` (`web_search`, `web_fetch`, plus neutral `read_file` / `write_file` / `edit_file` / `bash` that delegate to the `shared.ts` helpers)
   - `src/skills/` - Opt-in skill bundle (`pr-review`, `docs-update`, `public-docs`, `developer-experience`, `code-simplifier`); each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitive (`cron`, GitHub/Grafana/Linear/Telegram webhook receivers, plus the Telegram Bot API client); GitHub supports pull request, pull request review comment, issue comment, issues, and push events
