@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { mkdir, writeFile as fsWriteFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
@@ -95,7 +96,8 @@ const writeFile = new Tool({
   }),
   execute: async ({ path, content }, ctx): Promise<string> => {
     const filePath = resolve(ctx.cwd, path);
-    await Bun.write(filePath, content);
+    await mkdir(dirname(filePath), { recursive: true });
+    await fsWriteFile(filePath, content);
     return `Wrote ${filePath}.`;
   },
 });

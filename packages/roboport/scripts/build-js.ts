@@ -11,7 +11,7 @@ const proc = Bun.spawn(
     '--outdir',
     './dist',
     '--target',
-    'bun',
+    'node',
     '--external',
     'zod',
     '--root',

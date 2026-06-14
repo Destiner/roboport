@@ -118,6 +118,20 @@ describe('filesystem and shell tools', () => {
     expect(await Bun.file(join(workdir, 'out.txt')).text()).toBe('hello');
   });
 
+  test('write_file creates missing parent directories', async (): Promise<void> => {
+    const ctx = makeCtx();
+
+    const input = writeFile.parse({
+      path: join('nested', 'dir', 'out.txt'),
+      content: 'deep',
+    });
+    await writeFile.execute(input, ctx);
+
+    expect(
+      await Bun.file(join(workdir, 'nested', 'dir', 'out.txt')).text(),
+    ).toBe('deep');
+  });
+
   test('edit_file applies multiple exact replacements', async (): Promise<void> => {
     await Bun.write(join(workdir, 'src.txt'), 'foo bar baz');
     const ctx = makeCtx();

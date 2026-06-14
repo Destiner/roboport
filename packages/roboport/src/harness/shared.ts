@@ -1,9 +1,36 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdir, readFile as fsReadFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
 import { Tool, type SearchHit, type ToolContext } from '@/core';
+
+// Collect a child process's stdout/stderr and resolve with its exit code.
+// Centralizes the Node child_process plumbing so call sites stay declarative.
+// When `missingMessage` is set, an ENOENT (binary not in PATH) is surfaced as
+// that message instead of the raw spawn error.
+function collectProcess(
+  proc: ChildProcess,
+  missingMessage?: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    proc.stdout?.on('data', (chunk: Buffer) => (stdout += chunk));
+    proc.stderr?.on('data', (chunk: Buffer) => (stderr += chunk));
+    proc.on('error', (error: NodeJS.ErrnoException) => {
+      reject(
+        missingMessage && error.code === 'ENOENT'
+          ? new Error(missingMessage)
+          : error,
+      );
+    });
+    proc.on('close', (code, signal) => {
+      resolve({ stdout, stderr, exitCode: code ?? (signal ? 1 : 0) });
+    });
+  });
+}
 
 function notImplemented(name: string): () => Promise<never> {
   return async (): Promise<never> => {
@@ -77,31 +104,23 @@ async function runShell({
   login?: boolean;
 }): Promise<string> {
   const shellPath = shell ?? 'bash';
-  // Pass env explicitly: Bun seeds child env from a startup snapshot and does
-  // not reflect later process.env mutations, which callers rely on for tokens
-  // set at runtime (e.g. a refreshed GH_TOKEN).
-  const proc = Bun.spawn([shellPath, login === false ? '-c' : '-lc', cmd], {
+  const proc = spawn(shellPath, [login === false ? '-c' : '-lc', cmd], {
     cwd: workdir,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    env: process.env,
   });
   const timer = setTimeout(() => proc.kill(), timeout ?? 120_000);
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
-  const exitCode = await proc.exited;
-  clearTimeout(timer);
-
-  return serializeShellResult(stdout, stderr, exitCode);
+  try {
+    const { stdout, stderr, exitCode } = await collectProcess(proc);
+    return serializeShellResult(stdout, stderr, exitCode);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function readFile(
   filePath: string,
   opts?: { offset?: number; limit?: number },
 ): Promise<string> {
-  const content = await Bun.file(filePath).text();
+  const content = await fsReadFile(filePath, 'utf8');
   const lines = content.split('\n');
   const start = opts?.offset ?? 0;
   const end = opts?.limit !== undefined ? start + opts.limit : lines.length;
@@ -120,7 +139,7 @@ async function applyExactReplacements(
   filePath: string,
   replacements: ExactReplacement[],
 ): Promise<number> {
-  const content = await Bun.file(filePath).text();
+  const content = await fsReadFile(filePath, 'utf8');
   const ranges = replacements.map(({ oldString, newString }) => {
     const start = content.indexOf(oldString);
     if (start === -1) {
@@ -153,7 +172,7 @@ async function applyExactReplacements(
   }
   updated += content.slice(cursor);
 
-  await Bun.write(filePath, updated);
+  await writeFile(filePath, updated);
   return ranges.length;
 }
 
@@ -225,7 +244,7 @@ async function applyPatchText(
     if (moveTo !== undefined) index += 1;
 
     const updatePath = r(updateFile);
-    let content = await Bun.file(updatePath).text();
+    let content = await fsReadFile(updatePath, 'utf8');
     while (index < lines.length - 1 && lines[index]?.startsWith('@@')) {
       index += 1;
       const oldLines: string[] = [];
@@ -351,6 +370,7 @@ function createToolSearch(): Tool {
 export {
   applyExactReplacements,
   applyPatchText,
+  collectProcess,
   createToolSearch,
   notImplemented,
   readFile,
