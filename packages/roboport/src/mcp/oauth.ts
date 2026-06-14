@@ -1,3 +1,6 @@
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+
 interface AuthorizationServerMetadata {
   authorization_endpoint: string;
   token_endpoint: string;
@@ -108,13 +111,23 @@ async function registerClient(
 }
 
 function openBrowser(url: string): void {
-  const cmd =
-    process.platform === 'darwin'
-      ? 'open'
-      : process.platform === 'win32'
-        ? 'start'
-        : 'xdg-open';
-  Bun.spawn([cmd, url], { stdout: 'ignore', stderr: 'ignore' });
+  // On Windows `start` is a cmd.exe builtin, not an executable. rundll32's URL
+  // handler opens the default browser without routing the URL through a shell,
+  // so the `&`/`%` in an OAuth authorization URL are not mangled by cmd parsing.
+  const child =
+    process.platform === 'win32'
+      ? spawn('rundll32', ['url.dll,FileProtocolHandler', url], {
+          stdio: 'ignore',
+          detached: true,
+        })
+      : spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {
+          stdio: 'ignore',
+          detached: true,
+        });
+  // Best-effort launch: a missing opener emits 'error' asynchronously, which
+  // would otherwise crash the process as an unhandled EventEmitter error.
+  child.on('error', () => {});
+  child.unref();
 }
 
 function captureAuthorizationCode(
@@ -123,43 +136,48 @@ function captureAuthorizationCode(
   timeoutMs: number,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const server = Bun.serve({
-      port,
-      hostname: '127.0.0.1',
-      fetch(req): Response {
-        const u = new URL(req.url);
-        const error = u.searchParams.get('error');
-        if (error) {
-          const desc = u.searchParams.get('error_description') ?? '';
-          finish(() => reject(new Error(`OAuth error: ${error} ${desc}`)));
-          return new Response(
-            'Authentication failed. You can close this tab.',
-            {
-              status: 400,
-            },
-          );
-        }
-        const code = u.searchParams.get('code');
-        const state = u.searchParams.get('state');
-        if (!code || state !== expectedState) {
-          finish(() =>
-            reject(new Error('OAuth state mismatch or missing code.')),
-          );
-          return new Response('Invalid OAuth response.', { status: 400 });
-        }
-        finish(() => resolve(code));
-        return new Response(
-          '<html><body>Authenticated. You can close this tab.</body></html>',
-          { headers: { 'content-type': 'text/html' } },
+    const server = createServer((req, res) => {
+      const u = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
+      const error = u.searchParams.get('error');
+      if (error) {
+        const desc = u.searchParams.get('error_description') ?? '';
+        res.writeHead(400);
+        res.end('Authentication failed. You can close this tab.');
+        finish(() => reject(new Error(`OAuth error: ${error} ${desc}`)));
+        return;
+      }
+      const code = u.searchParams.get('code');
+      const state = u.searchParams.get('state');
+      if (!code || state !== expectedState) {
+        res.writeHead(400);
+        res.end('Invalid OAuth response.');
+        finish(() =>
+          reject(new Error('OAuth state mismatch or missing code.')),
         );
-      },
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(
+        '<html><body>Authenticated. You can close this tab.</body></html>',
+      );
+      finish(() => resolve(code));
     });
+    // listen() reports failures (e.g. EADDRINUSE) asynchronously via 'error';
+    // without a listener Node treats it as an unhandled error and crashes.
+    server.on('error', (error) => finish(() => reject(error)));
+    server.listen(port, '127.0.0.1');
     const timer = setTimeout(() => {
       finish(() => reject(new Error('OAuth flow timed out.')));
     }, timeoutMs);
+    let settled = false;
     function finish(action: () => void): void {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      setTimeout(() => server.stop(true), 50);
+      setTimeout(() => {
+        server.close();
+        server.closeAllConnections();
+      }, 50);
       action();
     }
   });

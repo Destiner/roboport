@@ -1,3 +1,5 @@
+import { spawn, type ChildProcess } from 'node:child_process';
+
 import { Tool, type McpClient } from '@/core';
 
 import type { AuthProvider } from './auth';
@@ -60,48 +62,63 @@ interface Transport {
 
 class StdioTransport implements Transport {
   private config: StdioTransportConfig;
-  private proc?: ReturnType<typeof Bun.spawn>;
+  private proc?: ChildProcess;
   private nextId = 1;
   private pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: unknown) => void }
   >();
   private buffer = '';
+  private spawnError?: Error;
 
   constructor(config: StdioTransportConfig) {
     this.config = config;
   }
 
   async start(): Promise<void> {
-    this.proc = Bun.spawn([this.config.command, ...(this.config.args ?? [])], {
-      stdin: 'pipe',
-      stdout: 'pipe',
-      stderr: 'inherit',
-      env: { ...process.env, ...this.config.env } as Record<string, string>,
+    const proc = spawn(this.config.command, this.config.args ?? [], {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      env: { ...process.env, ...this.config.env },
+    });
+    this.proc = proc;
+    // Node reports a failed spawn (e.g. ENOENT) asynchronously via 'error',
+    // not by throwing. Record it and reject pending requests so an in-flight
+    // or later `connect()` rejects with the spawn error instead of hanging.
+    proc.on('error', (error) => {
+      this.spawnError =
+        error instanceof Error ? error : new Error(String(error));
+      this.failPending(this.spawnError);
     });
     void this.readLoop();
   }
 
-  private async readLoop(): Promise<void> {
-    if (!this.proc?.stdout) return;
-    const reader = (this.proc.stdout as ReadableStream<Uint8Array>).getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      this.buffer += decoder.decode(value, { stream: true });
-      let idx = this.buffer.indexOf('\n');
-      while (idx !== -1) {
-        const line = this.buffer.slice(0, idx).trim();
-        this.buffer = this.buffer.slice(idx + 1);
-        if (line) this.handleLine(line);
-        idx = this.buffer.indexOf('\n');
-      }
-    }
-    for (const { reject } of this.pending.values()) {
-      reject(new Error('MCP stdio transport closed.'));
-    }
+  private failPending(error: Error): void {
+    for (const { reject } of this.pending.values()) reject(error);
     this.pending.clear();
+  }
+
+  private async readLoop(): Promise<void> {
+    const stdout = this.proc?.stdout;
+    if (!stdout) return;
+    const decoder = new TextDecoder();
+    try {
+      for await (const chunk of stdout) {
+        this.buffer += decoder.decode(chunk as Uint8Array, { stream: true });
+        let idx = this.buffer.indexOf('\n');
+        while (idx !== -1) {
+          const line = this.buffer.slice(0, idx).trim();
+          this.buffer = this.buffer.slice(idx + 1);
+          if (line) this.handleLine(line);
+          idx = this.buffer.indexOf('\n');
+        }
+      }
+    } catch {
+      // Stream error (e.g. the child failed to spawn); the 'error' handler
+      // reports the cause. Fall through to reject any pending requests.
+    }
+    this.failPending(
+      this.spawnError ?? new Error('MCP stdio transport closed.'),
+    );
   }
 
   private handleLine(line: string): void {
@@ -126,21 +143,25 @@ class StdioTransport implements Transport {
   }
 
   async stop(): Promise<void> {
-    this.proc?.kill();
-    if (this.proc) await this.proc.exited;
+    const proc = this.proc;
+    if (!proc) return;
     this.proc = undefined;
+    proc.kill();
+    if (proc.exitCode === null && proc.signalCode === null) {
+      await new Promise<void>((resolve) => proc.once('close', () => resolve()));
+    }
   }
 
   private writeLine(line: string): void {
     const sink = this.proc?.stdin;
-    if (!sink || typeof sink === 'number') {
+    if (!sink) {
       throw new Error('MCP stdio transport not started.');
     }
     sink.write(`${line}\n`);
-    sink.flush();
   }
 
   async request(method: string, params?: unknown): Promise<unknown> {
+    if (this.spawnError) return Promise.reject(this.spawnError);
     const id = this.nextId++;
     const req: JsonRpcRequest = { jsonrpc: '2.0', id, method, params };
     return new Promise((resolve, reject) => {

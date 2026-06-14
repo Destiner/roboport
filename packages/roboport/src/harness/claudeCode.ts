@@ -1,5 +1,12 @@
-import { stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import {
+  glob as fsGlob,
+  mkdir,
+  readFile as fsReadFile,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
@@ -8,6 +15,7 @@ import { Tool, type ToolContext } from '@/core';
 import { Harness } from './core';
 import {
   applyExactReplacements,
+  collectProcess,
   createToolSearch,
   notImplemented,
   readFile,
@@ -108,9 +116,9 @@ const edit = new Tool({
     replace_all,
   }): Promise<string> => {
     if (replace_all) {
-      const content = await Bun.file(file_path).text();
+      const content = await fsReadFile(file_path, 'utf8');
       const updated = content.split(old_string).join(new_string);
-      await Bun.write(file_path, updated);
+      await writeFile(file_path, updated);
       return `Edited ${file_path} (replace_all).`;
     }
     await applyExactReplacements(file_path, [
@@ -131,7 +139,8 @@ const write = new Tool({
     content: z.string().describe('The content to write to the file.'),
   }),
   execute: async ({ file_path, content }): Promise<string> => {
-    await Bun.write(file_path, content);
+    await mkdir(dirname(file_path), { recursive: true });
+    await writeFile(file_path, content);
     return `Wrote ${file_path}.`;
   },
 });
@@ -149,19 +158,22 @@ const glob = new Tool({
   }),
   execute: async ({ pattern, path: searchPath }, ctx): Promise<string> => {
     const cwd = searchPath ? resolve(ctx.cwd, searchPath) : ctx.cwd;
-    const scanner = new Bun.Glob(pattern);
     const matches: string[] = [];
-    for await (const file of scanner.scan({ cwd, onlyFiles: true })) {
-      matches.push(resolve(cwd, file));
+    for await (const entry of fsGlob(pattern, { cwd })) {
+      matches.push(resolve(cwd, entry));
     }
-    const withMtime = await Promise.all(
-      matches.map(async (file) => ({
-        file,
-        mtime: (await stat(file)).mtimeMs,
-      })),
-    );
-    withMtime.sort((a, b) => b.mtime - a.mtime);
-    return withMtime.map(({ file }) => file).join('\n');
+    // node:fs glob matches directories too; stat each match to keep only files
+    // (Bun.Glob's onlyFiles) and reuse the stat for the mtime sort.
+    const files = (
+      await Promise.all(
+        matches.map(async (file) => {
+          const info = await stat(file);
+          return info.isFile() ? { file, mtime: info.mtimeMs } : null;
+        }),
+      )
+    ).filter((entry) => entry !== null);
+    files.sort((a, b) => b.mtime - a.mtime);
+    return files.map(({ file }) => file).join('\n');
   },
 });
 
@@ -254,11 +266,6 @@ const grep = new Tool({
       );
     }
 
-    const grepPath = Bun.which('grep');
-    if (!grepPath) {
-      throw new Error('grep not found in PATH.');
-    }
-
     const typeGlobs: Record<string, string[]> = {
       js: ['*.js', '*.mjs', '*.cjs'],
       ts: ['*.ts', '*.tsx', '*.mts', '*.cts'],
@@ -277,49 +284,43 @@ const grep = new Tool({
       sh: ['*.sh', '*.bash', '*.zsh'],
     };
 
-    const cmd: string[] = [
-      grepPath,
+    const argv: string[] = [
       '-r',
       '-E',
       '--exclude-dir=node_modules',
       '--exclude-dir=.git',
     ];
-    if (args['-i']) cmd.push('-i');
+    if (args['-i']) argv.push('-i');
 
     const mode = args.output_mode ?? 'files_with_matches';
     if (mode === 'files_with_matches') {
-      cmd.push('-l');
+      argv.push('-l');
     } else if (mode === 'count') {
-      cmd.push('-c');
+      argv.push('-c');
     } else {
-      if (args['-n'] !== false) cmd.push('-n');
-      if (args['-A'] !== undefined) cmd.push('-A', String(args['-A']));
-      if (args['-B'] !== undefined) cmd.push('-B', String(args['-B']));
-      if (args['-C'] !== undefined) cmd.push('-C', String(args['-C']));
-      if (args['-o']) cmd.push('-o');
+      if (args['-n'] !== false) argv.push('-n');
+      if (args['-A'] !== undefined) argv.push('-A', String(args['-A']));
+      if (args['-B'] !== undefined) argv.push('-B', String(args['-B']));
+      if (args['-C'] !== undefined) argv.push('-C', String(args['-C']));
+      if (args['-o']) argv.push('-o');
     }
 
-    if (args.glob) cmd.push(`--include=${args.glob}`);
+    if (args.glob) argv.push(`--include=${args.glob}`);
     if (args.type) {
       const globs = typeGlobs[args.type];
       if (!globs) {
         throw new Error(`Unknown file type: ${args.type}`);
       }
-      for (const g of globs) cmd.push(`--include=${g}`);
+      for (const g of globs) argv.push(`--include=${g}`);
     }
 
-    cmd.push('--', args.pattern, args.path ?? '.');
+    argv.push('--', args.pattern, args.path ?? '.');
 
-    const proc = Bun.spawn(cmd, {
-      cwd: ctx.cwd,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
-    const exitCode = await proc.exited;
+    const proc = spawn('grep', argv, { cwd: ctx.cwd });
+    const { stdout, stderr, exitCode } = await collectProcess(
+      proc,
+      'grep not found in PATH.',
+    );
     if (exitCode !== 0 && exitCode !== 1) {
       throw new Error(`grep failed (exit ${exitCode}): ${stderr.trim()}`);
     }
