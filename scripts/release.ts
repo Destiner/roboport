@@ -20,5 +20,8 @@ if (view.exitCode === 0 && view.stdout.toString().trim() === version) {
 
 await $`npm publish --access public`.cwd(distDir);
 
-// changesets/action parses this line to create the GitHub release + git tag.
+// `changeset publish` would tag the release; we publish from `dist/` directly,
+// so create the tag ourselves. changesets/action pushes this tag and parses the
+// "New tag:" line below to open the GitHub release.
+await $`git tag ${name}@${version}`;
 console.log(`New tag: ${name}@${version}`);
