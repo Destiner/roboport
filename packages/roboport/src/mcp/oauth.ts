@@ -111,18 +111,23 @@ async function registerClient(
 }
 
 function openBrowser(url: string): void {
-  if (process.platform === 'win32') {
-    // `start` is a cmd.exe builtin, not an executable. rundll32's URL handler
-    // opens the default browser without routing the URL through a shell, so the
-    // `&`/`%` in an OAuth authorization URL are not mangled by cmd parsing.
-    spawn('rundll32', ['url.dll,FileProtocolHandler', url], {
-      stdio: 'ignore',
-      detached: true,
-    }).unref();
-    return;
-  }
-  const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
-  spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
+  // On Windows `start` is a cmd.exe builtin, not an executable. rundll32's URL
+  // handler opens the default browser without routing the URL through a shell,
+  // so the `&`/`%` in an OAuth authorization URL are not mangled by cmd parsing.
+  const child =
+    process.platform === 'win32'
+      ? spawn('rundll32', ['url.dll,FileProtocolHandler', url], {
+          stdio: 'ignore',
+          detached: true,
+        })
+      : spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {
+          stdio: 'ignore',
+          detached: true,
+        });
+  // Best-effort launch: a missing opener emits 'error' asynchronously, which
+  // would otherwise crash the process as an unhandled EventEmitter error.
+  child.on('error', () => {});
+  child.unref();
 }
 
 function captureAuthorizationCode(
@@ -157,11 +162,17 @@ function captureAuthorizationCode(
       );
       finish(() => resolve(code));
     });
+    // listen() reports failures (e.g. EADDRINUSE) asynchronously via 'error';
+    // without a listener Node treats it as an unhandled error and crashes.
+    server.on('error', (error) => finish(() => reject(error)));
     server.listen(port, '127.0.0.1');
     const timer = setTimeout(() => {
       finish(() => reject(new Error('OAuth flow timed out.')));
     }, timeoutMs);
+    let settled = false;
     function finish(action: () => void): void {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       setTimeout(() => {
         server.close();
