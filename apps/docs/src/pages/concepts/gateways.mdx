@@ -11,7 +11,10 @@ Use `serve` to bind an agent to a gateway:
 ```ts
 import { serve, telegramGateway } from 'roboport/gateways';
 
-const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }));
+const bot = serve(
+  agent,
+  telegramGateway({ token: process.env.TELEGRAM_TOKEN }),
+);
 // later: await bot.stop();
 ```
 
@@ -26,7 +29,10 @@ You can also use webhooks, which are recommended in production:
 ```ts
 const gateway = telegramGateway({
   token: process.env.TELEGRAM_TOKEN,
-  transport: { mode: 'webhook', secretToken: process.env.TELEGRAM_WEBHOOK_SECRET },
+  transport: {
+    mode: 'webhook',
+    secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+  },
 });
 const bot = serve(agent, gateway);
 
@@ -37,6 +43,10 @@ await gateway.client.setWebhook(`${publicUrl}${route}`, {
   allowedUpdates: ['message'],
 });
 ```
+
+## Rich replies
+
+The Telegram gateway sends replies as [rich messages](https://core.telegram.org/bots/api#rich-markdown-style): the reply text is treated as GitHub-Flavored Markdown and rendered with headings, lists, tables, blockquotes, fenced code blocks, math, and collapsible blocks — so an agent's Markdown output shows up formatted instead of as literal `**` and backticks. Streaming replies (`stream`) animate an ephemeral rich draft bubble while the turn runs, then commit the final rich message. No escaping or configuration is required.
 
 ## Custom gateway
 

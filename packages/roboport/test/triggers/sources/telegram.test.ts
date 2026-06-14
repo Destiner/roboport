@@ -273,6 +273,126 @@ describe('TelegramClient', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  test('sendRichMessage posts rich_message markdown without splitting', async () => {
+    let body: Record<string, unknown> = {};
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({ ok: true, result: { message_id: 1 } }),
+        { headers: { 'content-type': 'application/json' } },
+      );
+    }) as never);
+
+    const client = new TelegramClient('token');
+    await client.sendRichMessage(
+      42,
+      { markdown: '# Title\n\n- a\n- b' },
+      { messageThreadId: 9 },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(body).toMatchObject({
+      chat_id: 42,
+      rich_message: { markdown: '# Title\n\n- a\n- b' },
+      message_thread_id: 9,
+    });
+  });
+
+  test('sendRichMessage requires exactly one of markdown/html', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(client.sendRichMessage(42, {})).rejects.toThrow('exactly one');
+    await expect(
+      client.sendRichMessage(42, { markdown: 'a', html: '<b>a</b>' }),
+    ).rejects.toThrow('exactly one');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test('sendRichMessage refuses content over the rich limit', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(
+      client.sendRichMessage(42, { markdown: 'x'.repeat(32769) }),
+    ).rejects.toThrow("can't be split");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test('sendRichMessageDraft posts rich_message and draft_id', async () => {
+    let body: Record<string, unknown> = {};
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(JSON.stringify({ ok: true, result: true }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as never);
+
+    const client = new TelegramClient('token');
+    const ok = await client.sendRichMessageDraft(42, 7, { markdown: '**hi**' });
+
+    expect(ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(body).toMatchObject({
+      chat_id: 42,
+      draft_id: 7,
+      rich_message: { markdown: '**hi**' },
+    });
+  });
+
+  test('sendRichMessageDraft accepts empty markdown to clear the draft', async () => {
+    let body: Record<string, unknown> = {};
+    spyOn(globalThis, 'fetch').mockImplementation((async (
+      _url: string,
+      init: RequestInit,
+    ) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(JSON.stringify({ ok: true, result: true }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as never);
+
+    const client = new TelegramClient('token');
+    await client.sendRichMessageDraft(42, 7, { markdown: '' });
+
+    expect(body).toMatchObject({
+      chat_id: 42,
+      draft_id: 7,
+      rich_message: { markdown: '' },
+    });
+  });
+
+  test('sendRichMessageDraft rejects a zero draftId without calling the API', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        new Response(JSON.stringify({ ok: true, result: true }), {
+          headers: { 'content-type': 'application/json' },
+        })) as never,
+    );
+
+    const client = new TelegramClient('token');
+    await expect(
+      client.sendRichMessageDraft(42, 0, { markdown: 'hi' }),
+    ).rejects.toThrow('non-zero');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   test('throws when the API responds with ok: false', async () => {
     spyOn(globalThis, 'fetch').mockImplementation(
       (async () =>
