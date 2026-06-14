@@ -16,7 +16,6 @@ Minimal TypeScript framework for building LLM agents.
 ## Stack
 
 - TypeScript 6
-- Runtime: Bun for workspace tooling; `roboport` targets Node >=22.17
 - Schemas: Zod 4
 - Lint: ESLint
 
