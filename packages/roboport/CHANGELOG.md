@@ -1,5 +1,11 @@
 # roboport
 
+## 0.5.1
+
+### Patch Changes
+
+- [#65](https://github.com/Destiner/roboport/pull/65) [`807b464`](https://github.com/Destiner/roboport/commit/807b4646f5afce894691eb77a91418876edb1dff) Thanks [@Destiner](https://github.com/Destiner)! - Drop the hard Bun runtime dependency so the package runs on Node.js.
+
 ## 0.5.0
 
 ### Minor Changes
