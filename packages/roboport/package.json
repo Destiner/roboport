@@ -1,6 +1,6 @@
 {
   "name": "roboport",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Minimal TypeScript framework for building LLM agents.",
   "author": {
     "name": "Timur Badretdinov",

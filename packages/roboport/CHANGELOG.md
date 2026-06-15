@@ -1,5 +1,11 @@
 # roboport
 
+## 0.6.0
+
+### Minor Changes
+
+- [#67](https://github.com/Destiner/roboport/pull/67) [`cbd913a`](https://github.com/Destiner/roboport/commit/cbd913a25bce0236637f991aa0b5f81d54ed64f3) Thanks [@Destiner](https://github.com/Destiner)! - Telegram replies are now sent as rich messages, rendering Markdown (headings, lists, tables, code, math) instead of plain text.
+
 ## 0.5.1
 
 ### Patch Changes
