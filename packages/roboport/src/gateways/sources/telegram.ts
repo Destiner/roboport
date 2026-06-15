@@ -1,9 +1,10 @@
 import type { MaybePromise, Unsub } from '@/triggers/core';
 import {
   matchesCommand,
+  MAX_RICH_MESSAGE_LENGTH,
   TelegramClient,
   TelegramReceiver,
-  type SendMessageOptions,
+  type SendRichMessageOptions,
   type TelegramMessage,
 } from '@/triggers/sources/telegram';
 
@@ -18,7 +19,7 @@ import type {
 interface TelegramChannel extends Channel {
   chatId: number;
   client: TelegramClient;
-  send(text: string, opts?: SendMessageOptions): Promise<void>;
+  send(text: string, opts?: SendRichMessageOptions): Promise<void>;
   draft(text: string): Promise<void>;
 }
 
@@ -44,7 +45,7 @@ const TYPING_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_SECONDS = 25;
 const POLL_BACKOFF_MS = 1000;
 const DRAFT_THROTTLE_MS = 500;
-const DRAFT_MAX_LENGTH = 4096;
+const DRAFT_MAX_LENGTH = MAX_RICH_MESSAGE_LENGTH;
 
 // Key per forum topic when present, so each topic is an independent session;
 // otherwise per chat. Drafts/replies are routed back to the same topic.
@@ -103,16 +104,23 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
       chatId,
       client,
       // Default replies/drafts to the originating topic; caller opts win.
-      send: async (text: string, opts?: SendMessageOptions): Promise<void> => {
-        await client.sendMessage(chatId, text, {
-          messageThreadId: threadId,
-          ...opts,
-        });
+      send: async (
+        text: string,
+        opts?: SendRichMessageOptions,
+      ): Promise<void> => {
+        await client.sendRichMessage(
+          chatId,
+          { markdown: text },
+          { messageThreadId: threadId, ...opts },
+        );
       },
       draft: async (text: string): Promise<void> => {
-        await client.sendMessageDraft(chatId, message.message_id, text, {
-          messageThreadId: threadId,
-        });
+        await client.sendRichMessageDraft(
+          chatId,
+          message.message_id,
+          { markdown: text },
+          { messageThreadId: threadId },
+        );
       },
       thinking: (): (() => void) => startTyping(client, chatId),
     };
@@ -195,8 +203,8 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
   };
 }
 
-// Streaming relay for Telegram: refresh an ephemeral draft bubble as tokens
-// arrive (throttled), then commit the final text with sendMessage.
+// Streaming relay for Telegram: refresh an ephemeral rich draft bubble as
+// tokens arrive (throttled), then commit the final reply with sendRichMessage.
 function stream(
   options: { throttleMs?: number } = {},
 ): Relay<InboundMessage, TelegramChannel> {

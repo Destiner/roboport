@@ -65,6 +65,25 @@ interface SendMessageDraftOptions {
   messageThreadId?: number;
 }
 
+// A Telegram rich message: exactly one of `markdown` (GFM-compatible) or `html`.
+type RichMessage = (
+  | { markdown: string; html?: never }
+  | { html: string; markdown?: never }
+) & {
+  isRtl?: boolean;
+  skipEntityDetection?: boolean;
+};
+
+interface SendRichMessageOptions {
+  replyToMessageId?: number;
+  disableNotification?: boolean;
+  messageThreadId?: number;
+}
+
+interface SendRichMessageDraftOptions {
+  messageThreadId?: number;
+}
+
 interface TelegramReceiverOptions {
   secretToken: string;
   updateCacheSize?: number;
@@ -74,6 +93,37 @@ const DEFAULT_UPDATE_CACHE_SIZE = 1024;
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 // Telegram caps message text at 4096 UTF-16 code units.
 const MAX_MESSAGE_LENGTH = 4096;
+// Rich messages allow far more: up to 32768 UTF-8 characters.
+const MAX_RICH_MESSAGE_LENGTH = 32768;
+
+// Validate a rich message and build its `rich_message` payload, enforcing the
+// API's "exactly one of markdown/html" rule and the rich length limit.
+// Presence (not truthiness) is checked, so an empty markdown clears a draft.
+// `limitNote` names the unit (message vs draft) in the over-limit error.
+function toRichMessagePayload(
+  method: string,
+  content: RichMessage,
+  limitNote: string,
+): Record<string, unknown> {
+  const hasMarkdown = content.markdown !== undefined;
+  const hasHtml = content.html !== undefined;
+  if (hasMarkdown === hasHtml) {
+    throw new Error(
+      'rich message requires exactly one of `markdown` or `html`',
+    );
+  }
+  const length = (content.markdown ?? content.html ?? '').length;
+  if (length > MAX_RICH_MESSAGE_LENGTH) {
+    throw new Error(
+      `${method}: content exceeds ${MAX_RICH_MESSAGE_LENGTH} chars; ${limitNote}`,
+    );
+  }
+  return {
+    ...(hasMarkdown ? { markdown: content.markdown } : { html: content.html }),
+    ...(content.isRtl ? { is_rtl: true } : {}),
+    ...(content.skipEntityDetection ? { skip_entity_detection: true } : {}),
+  };
+}
 
 function matchesCommand(
   message: TelegramMessage,
@@ -328,6 +378,66 @@ class TelegramClient {
     });
   }
 
+  // Sends a rich message (GFM-compatible Markdown or HTML) that clients render
+  // with headings, lists, tables, blockquotes, code blocks, math, collapsible
+  // blocks, and media. Unlike plain text we never auto-split: a rich message is
+  // a single structured document and chunking would break its blocks/tables, so
+  // keep it within the 32768-char limit.
+  async sendRichMessage(
+    chatId: number | string,
+    content: RichMessage,
+    opts?: SendRichMessageOptions,
+  ): Promise<TelegramMessage> {
+    const richMessage = toRichMessagePayload(
+      'sendRichMessage',
+      content,
+      "a rich message is a single document and can't be split.",
+    );
+    return this.call<TelegramMessage>('sendRichMessage', {
+      chat_id: chatId,
+      rich_message: richMessage,
+      ...(opts?.messageThreadId !== undefined
+        ? { message_thread_id: opts.messageThreadId }
+        : {}),
+      ...(opts?.replyToMessageId
+        ? { reply_parameters: { message_id: opts.replyToMessageId } }
+        : {}),
+      ...(opts?.disableNotification ? { disable_notification: true } : {}),
+    });
+  }
+
+  // Streams a partial rich message as an ephemeral draft bubble (private chats
+  // only). Like sendMessageDraft, successive calls with the same non-zero
+  // draftId animate in place and the draft expires after ~30s, so the caller
+  // must persist the result with sendRichMessage once generation ends. A draft
+  // is a single bubble and can't be split, so content must fit the 32768-char
+  // limit.
+  async sendRichMessageDraft(
+    chatId: number,
+    draftId: number,
+    content: RichMessage,
+    opts?: SendRichMessageDraftOptions,
+  ): Promise<boolean> {
+    if (!Number.isInteger(draftId) || draftId === 0) {
+      throw new Error(
+        'sendRichMessageDraft: draftId must be a non-zero integer',
+      );
+    }
+    const richMessage = toRichMessagePayload(
+      'sendRichMessageDraft',
+      content,
+      "a draft is a single bubble and can't be split.",
+    );
+    return this.call<boolean>('sendRichMessageDraft', {
+      chat_id: chatId,
+      draft_id: draftId,
+      rich_message: richMessage,
+      ...(opts?.messageThreadId !== undefined
+        ? { message_thread_id: opts.messageThreadId }
+        : {}),
+    });
+  }
+
   setWebhook(
     url: string,
     opts?: { secretToken?: string; allowedUpdates?: string[] },
@@ -376,8 +486,12 @@ export {
   TelegramClient,
   TelegramReceiver,
   splitMessage,
+  MAX_RICH_MESSAGE_LENGTH,
+  type RichMessage,
   type SendMessageDraftOptions,
   type SendMessageOptions,
+  type SendRichMessageDraftOptions,
+  type SendRichMessageOptions,
   type TelegramChat,
   type TelegramChatAction,
   type TelegramMessage,

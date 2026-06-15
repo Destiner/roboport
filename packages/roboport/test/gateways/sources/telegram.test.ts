@@ -90,7 +90,7 @@ describe('TelegramChannel', () => {
     return channel;
   }
 
-  test('send relays through the client sendMessage API', async () => {
+  test('send relays through the client sendRichMessage API', async () => {
     const channel = await captureChannel();
     let body: Record<string, unknown> = {};
     spyOn(globalThis, 'fetch').mockImplementation((async (
@@ -105,7 +105,10 @@ describe('TelegramChannel', () => {
     }) as never);
 
     await channel.send('reply');
-    expect(body).toMatchObject({ chat_id: 42, text: 'reply' });
+    expect(body).toMatchObject({
+      chat_id: 42,
+      rich_message: { markdown: 'reply' },
+    });
   });
 
   test('keys per forum topic and routes replies back to it', async () => {
@@ -127,12 +130,12 @@ describe('TelegramChannel', () => {
     await channel.send('reply');
     expect(body).toMatchObject({
       chat_id: 42,
-      text: 'reply',
+      rich_message: { markdown: 'reply' },
       message_thread_id: 9,
     });
   });
 
-  test('draft relays through the client sendMessageDraft API', async () => {
+  test('draft relays through the client sendRichMessageDraft API', async () => {
     const channel = await captureChannel();
     let body: Record<string, unknown> = {};
     spyOn(globalThis, 'fetch').mockImplementation((async (
@@ -146,7 +149,11 @@ describe('TelegramChannel', () => {
     }) as never);
 
     await channel.draft('partial');
-    expect(body).toMatchObject({ chat_id: 42, draft_id: 1, text: 'partial' });
+    expect(body).toMatchObject({
+      chat_id: 42,
+      draft_id: 1,
+      rich_message: { markdown: 'partial' },
+    });
   });
 });
 

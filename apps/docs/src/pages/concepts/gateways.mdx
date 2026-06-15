@@ -11,7 +11,10 @@ Use `serve` to bind an agent to a gateway:
 ```ts
 import { serve, telegramGateway } from 'roboport/gateways';
 
-const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }));
+const bot = serve(
+  agent,
+  telegramGateway({ token: process.env.TELEGRAM_TOKEN }),
+);
 // later: await bot.stop();
 ```
 
@@ -26,7 +29,10 @@ You can also use webhooks, which are recommended in production:
 ```ts
 const gateway = telegramGateway({
   token: process.env.TELEGRAM_TOKEN,
-  transport: { mode: 'webhook', secretToken: process.env.TELEGRAM_WEBHOOK_SECRET },
+  transport: {
+    mode: 'webhook',
+    secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+  },
 });
 const bot = serve(agent, gateway);
 

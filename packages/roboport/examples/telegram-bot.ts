@@ -7,7 +7,8 @@ import { Anthropic } from '@/models';
 
 // A personal Telegram assistant: per-chat memory, a persona it maintains itself,
 // a bounded context window, and streamed replies. A trimmed-down take on a real
-// always-on agent you talk to from your phone.
+// always-on agent you talk to from your phone. Replies are sent as rich
+// messages, so the agent's Markdown renders with headings, lists, and code.
 const token = process.env.TELEGRAM_TOKEN;
 if (!token) throw new Error('TELEGRAM_TOKEN is required');
 
