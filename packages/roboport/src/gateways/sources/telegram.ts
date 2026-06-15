@@ -47,7 +47,6 @@ const TYPING_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_SECONDS = 25;
 const POLL_BACKOFF_MS = 1000;
 const DRAFT_THROTTLE_MS = 500;
-// Drafts are rich messages, so they share the rich single-bubble limit.
 const DRAFT_MAX_LENGTH = MAX_RICH_MESSAGE_LENGTH;
 
 // Key per forum topic when present, so each topic is an independent session;
