@@ -65,28 +65,22 @@ interface SendMessageDraftOptions {
   messageThreadId?: number;
 }
 
-// A Telegram "rich message": exactly one of `markdown` or `html`. Unlike
-// parse_mode formatting, `markdown` is GitHub-Flavored-Markdown compatible (and
-// may embed HTML), rendering headings, lists, tables, blockquotes, fenced code,
-// math, collapsible blocks, and media.
-interface RichMessage {
-  markdown?: string;
-  html?: string;
+// A Telegram rich message: exactly one of `markdown` (GFM-compatible) or `html`.
+type RichMessage = (
+  | { markdown: string; html?: never }
+  | { html: string; markdown?: never }
+) & {
   isRtl?: boolean;
-  // Skip auto-detection of URLs, emails, mentions, hashtags, commands, phone,
-  // and bank-card numbers in the text.
   skipEntityDetection?: boolean;
-}
+};
 
 interface SendRichMessageOptions {
   replyToMessageId?: number;
   disableNotification?: boolean;
-  // The thread (topic) to send into, for forum supergroups.
   messageThreadId?: number;
 }
 
 interface SendRichMessageDraftOptions {
-  // The thread (topic) to draft into, for forum supergroups.
   messageThreadId?: number;
 }
 
@@ -102,15 +96,26 @@ const MAX_MESSAGE_LENGTH = 4096;
 // Rich messages allow far more: up to 32768 UTF-8 characters.
 const MAX_RICH_MESSAGE_LENGTH = 32768;
 
-// Build the `rich_message` payload, enforcing the API's "exactly one of
-// markdown/html" rule. Presence (not truthiness) is checked, so an empty
-// markdown string is valid and clears a draft.
-function toRichMessagePayload(content: RichMessage): Record<string, unknown> {
+// Validate a rich message and build its `rich_message` payload, enforcing the
+// API's "exactly one of markdown/html" rule and the rich length limit.
+// Presence (not truthiness) is checked, so an empty markdown clears a draft.
+// `limitNote` names the unit (message vs draft) in the over-limit error.
+function toRichMessagePayload(
+  method: string,
+  content: RichMessage,
+  limitNote: string,
+): Record<string, unknown> {
   const hasMarkdown = content.markdown !== undefined;
   const hasHtml = content.html !== undefined;
   if (hasMarkdown === hasHtml) {
     throw new Error(
       'rich message requires exactly one of `markdown` or `html`',
+    );
+  }
+  const length = (content.markdown ?? content.html ?? '').length;
+  if (length > MAX_RICH_MESSAGE_LENGTH) {
+    throw new Error(
+      `${method}: content exceeds ${MAX_RICH_MESSAGE_LENGTH} chars; ${limitNote}`,
     );
   }
   return {
@@ -383,13 +388,11 @@ class TelegramClient {
     content: RichMessage,
     opts?: SendRichMessageOptions,
   ): Promise<TelegramMessage> {
-    const richMessage = toRichMessagePayload(content);
-    const length = (content.markdown ?? content.html ?? '').length;
-    if (length > MAX_RICH_MESSAGE_LENGTH) {
-      throw new Error(
-        `sendRichMessage: content exceeds ${MAX_RICH_MESSAGE_LENGTH} chars; a rich message is a single document and can't be split.`,
-      );
-    }
+    const richMessage = toRichMessagePayload(
+      'sendRichMessage',
+      content,
+      "a rich message is a single document and can't be split.",
+    );
     return this.call<TelegramMessage>('sendRichMessage', {
       chat_id: chatId,
       rich_message: richMessage,
@@ -420,13 +423,11 @@ class TelegramClient {
         'sendRichMessageDraft: draftId must be a non-zero integer',
       );
     }
-    const richMessage = toRichMessagePayload(content);
-    const length = (content.markdown ?? content.html ?? '').length;
-    if (length > MAX_RICH_MESSAGE_LENGTH) {
-      throw new Error(
-        `sendRichMessageDraft: content exceeds ${MAX_RICH_MESSAGE_LENGTH} chars; a draft is a single bubble and can't be split.`,
-      );
-    }
+    const richMessage = toRichMessagePayload(
+      'sendRichMessageDraft',
+      content,
+      "a draft is a single bubble and can't be split.",
+    );
     return this.call<boolean>('sendRichMessageDraft', {
       chat_id: chatId,
       draft_id: draftId,

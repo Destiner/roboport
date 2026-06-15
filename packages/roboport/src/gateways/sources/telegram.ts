@@ -19,8 +19,6 @@ import type {
 interface TelegramChannel extends Channel {
   chatId: number;
   client: TelegramClient;
-  // Replies and drafts are sent as rich messages: `text` is GFM-compatible
-  // Markdown the client renders (headings, lists, tables, code blocks, …).
   send(text: string, opts?: SendRichMessageOptions): Promise<void>;
   draft(text: string): Promise<void>;
 }

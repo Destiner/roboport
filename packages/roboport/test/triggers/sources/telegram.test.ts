@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 
 import {
+  MAX_RICH_MESSAGE_LENGTH,
   splitMessage,
   TelegramClient,
   telegram,
+  type RichMessage,
   type TelegramMessage,
 } from '@/triggers/sources/telegram';
 
@@ -310,9 +312,15 @@ describe('TelegramClient', () => {
     );
 
     const client = new TelegramClient('token');
-    await expect(client.sendRichMessage(42, {})).rejects.toThrow('exactly one');
+    // The type forbids both invalid states; cast to exercise the runtime guard.
+    await expect(client.sendRichMessage(42, {} as RichMessage)).rejects.toThrow(
+      'exactly one',
+    );
     await expect(
-      client.sendRichMessage(42, { markdown: 'a', html: '<b>a</b>' }),
+      client.sendRichMessage(42, {
+        markdown: 'a',
+        html: '<b>a</b>',
+      } as unknown as RichMessage),
     ).rejects.toThrow('exactly one');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -327,7 +335,9 @@ describe('TelegramClient', () => {
 
     const client = new TelegramClient('token');
     await expect(
-      client.sendRichMessage(42, { markdown: 'x'.repeat(32769) }),
+      client.sendRichMessage(42, {
+        markdown: 'x'.repeat(MAX_RICH_MESSAGE_LENGTH + 1),
+      }),
     ).rejects.toThrow("can't be split");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
