@@ -153,18 +153,18 @@ app.post('/webhooks/github', (c) => gh.handle(c.req.raw));
 
 [Learn more](https://roboport.up.railway.app/concepts/triggers)
 
-## Gateways
+## Channels
 
-A gateway is a two-way connection between a chat transport and an agent: inbound messages run a turn, the reply is relayed back. `serve` wires it up — one long-lived conversation per chat, serialized, with a "typing" indicator and in-memory history by default (swap in `fileStore` to persist).
+A channel is a two-way connection between a chat transport and an agent: inbound messages run a turn, the reply is relayed back. `serve` wires it up — one long-lived conversation per chat, serialized, with a "typing" indicator and in-memory history by default (swap in `fileStore` to persist).
 
 ```ts
-import { serve, telegramGateway } from 'roboport/gateways';
+import { serve, telegramChannel } from 'roboport/channels';
 
 // Long-polling by default
-const bot = serve(agent, telegramGateway({ token: process.env.TELEGRAM_TOKEN }));
+const bot = serve(agent, telegramChannel({ token: process.env.TELEGRAM_TOKEN }));
 ```
 
-[Learn more](https://roboport.up.railway.app/concepts/gateways)
+[Learn more](https://roboport.up.railway.app/concepts/channels)
 
 ## Status
 

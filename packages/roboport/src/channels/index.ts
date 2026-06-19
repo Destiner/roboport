@@ -1,17 +1,17 @@
 import {
   type Channel,
-  type Gateway,
-  type GatewayHandler,
+  type ChannelHandler,
+  type Conversation,
   type InboundMessage,
   type Relay,
 } from './core';
-import { serve, type GatewayRuntime, type ServeOptions } from './serve';
+import { serve, type ChannelRuntime, type ServeOptions } from './serve';
 import {
   stream,
-  telegramGateway,
+  telegramChannel,
   type TelegramChannel,
-  type TelegramGateway,
-  type TelegramGatewayOptions,
+  type TelegramChannelOptions,
+  type TelegramConversation,
   type TelegramTransport,
 } from './sources/telegram';
 import { fileStore, memoryStore, type ConversationStore } from './store';
@@ -21,17 +21,17 @@ export {
   memoryStore,
   serve,
   stream,
-  telegramGateway,
+  telegramChannel,
   type Channel,
+  type ChannelHandler,
+  type ChannelRuntime,
+  type Conversation,
   type ConversationStore,
-  type Gateway,
-  type GatewayHandler,
-  type GatewayRuntime,
   type InboundMessage,
   type Relay,
   type ServeOptions,
   type TelegramChannel,
-  type TelegramGateway,
-  type TelegramGatewayOptions,
+  type TelegramChannelOptions,
+  type TelegramConversation,
   type TelegramTransport,
 };

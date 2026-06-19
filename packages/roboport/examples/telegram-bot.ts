@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 
+import { fileStore, serve, stream, telegramChannel } from '@/channels';
 import { Agent } from '@/core';
-import { fileStore, serve, stream, telegramGateway } from '@/gateways';
 import { claudeCode } from '@/harness';
 import { Anthropic } from '@/models';
 
@@ -25,7 +25,7 @@ const agent = new Agent({
   cwd: workspace, // the agent's home — its file tools read/write here
 });
 
-const bot = serve(agent, telegramGateway({ token }), {
+const bot = serve(agent, telegramChannel({ token }), {
   authorize: (message) => ownerIds.includes(message.user?.id ?? ''),
   // Standing instructions the agent edits over time, injected each turn.
   systemExtension: async () => {

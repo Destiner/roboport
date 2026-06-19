@@ -1,20 +1,24 @@
 import { Agent, Session, type Message, type TextPart, type Turn } from '@/core';
 
-import type { Channel, Gateway, InboundMessage, Relay } from './core';
+import type { Channel, Conversation, InboundMessage, Relay } from './core';
 import { memoryStore, type ConversationStore } from './store';
 
-interface ServeOptions<In extends InboundMessage, Ch extends Channel> {
+interface ServeOptions<In extends InboundMessage, Conv extends Conversation> {
   conversation?: (message: In) => string;
-  authorize?: (message: In, channel: Ch) => boolean | Promise<boolean>;
+  authorize?: (message: In, conversation: Conv) => boolean | Promise<boolean>;
   systemExtension?: (message: In) => string | Promise<string>;
   prompt?: (message: In) => string | TextPart[] | null;
   context?: (stored: Message[], message: In) => Message[] | Promise<Message[]>;
-  relay?: Relay<In, Ch>;
+  relay?: Relay<In, Conv>;
   store?: ConversationStore;
-  onError?: (error: Error, channel: Ch, message: In) => void | Promise<void>;
+  onError?: (
+    error: Error,
+    conversation: Conv,
+    message: In,
+  ) => void | Promise<void>;
 }
 
-interface GatewayRuntime {
+interface ChannelRuntime {
   stop(): Promise<void>;
   handle(req: Request): Promise<Response>;
 }
@@ -32,7 +36,10 @@ function newMessages(session: Session, seedLength: number): Message[] {
 }
 
 // Default relay: buffer the turn's completed text blocks and send one reply.
-async function bufferReplies(turn: Turn, channel: Channel): Promise<void> {
+async function bufferReplies(
+  turn: Turn,
+  conversation: Conversation,
+): Promise<void> {
   const blocks: string[] = [];
   let failure: Error | null = null;
   for await (const event of turn) {
@@ -41,35 +48,46 @@ async function bufferReplies(turn: Turn, channel: Channel): Promise<void> {
   }
   const reply = blocks.join('\n\n').trim();
   if (failure && !reply) throw failure;
-  await channel.send(reply || '(no response)');
+  await conversation.send(reply || '(no response)');
 }
 
 // Keep the user-facing default generic — raw errors can carry provider response
 // bodies or internal details. Callers wanting to surface specifics override onError.
-async function defaultError(error: Error, channel: Channel): Promise<void> {
-  console.error('[gateways] turn failed:', error);
-  await channel.send('Sorry — something went wrong.').catch(() => {});
+async function defaultError(
+  error: Error,
+  conversation: Conversation,
+): Promise<void> {
+  console.error('[channels] turn failed:', error);
+  await conversation.send('Sorry — something went wrong.').catch(() => {});
 }
 
-// Bind an agent to a gateway: one long-lived conversation per `conversationId`,
+// Bind an agent to a channel: one long-lived conversation per `conversationId`,
 // serialized per conversation (Session.send throws on a concurrent turn), with
 // the agent's reply relayed back. The single entry point — grow into the seams
-// over time, or drop to `gateway.open()` for fully custom routing.
-function serve<In extends InboundMessage, Ch extends Channel>(
+// over time, or drop to `channel.open()` for fully custom routing.
+function serve<In extends InboundMessage, Conv extends Conversation>(
   agent: Agent,
-  gateway: Gateway<In, Ch>,
-  options: ServeOptions<In, Ch> = {},
-): GatewayRuntime {
+  channel: Channel<In, Conv>,
+  options: ServeOptions<In, Conv> = {},
+): ChannelRuntime {
   const store = options.store ?? memoryStore();
   const keyOf =
     options.conversation ?? ((message: In): string => message.conversationId);
-  const relay: Relay<In, Ch> = options.relay ?? gateway.relay ?? bufferReplies;
+  const relay: Relay<In, Conv> =
+    options.relay ?? channel.relay ?? bufferReplies;
   const queues = new Map<string, Promise<unknown>>();
 
-  async function runTurn(message: In, channel: Ch, id: string): Promise<void> {
+  async function runTurn(
+    message: In,
+    conversation: Conv,
+    id: string,
+  ): Promise<void> {
     let stopThinking: (() => void) | undefined;
     try {
-      if (options.authorize && !(await options.authorize(message, channel))) {
+      if (
+        options.authorize &&
+        !(await options.authorize(message, conversation))
+      ) {
         return;
       }
       const promptValue = options.prompt
@@ -90,10 +108,10 @@ function serve<In extends InboundMessage, Ch extends Channel>(
       const session = agent.session({ messages: seed, systemExtension });
       // Persist the user turn before running, so a mid-turn crash still records it.
       await store.append(id, toUserMessage(promptValue));
-      stopThinking = channel.thinking?.();
+      stopThinking = conversation.thinking?.();
       try {
         const turn = session.send(promptValue);
-        await relay(turn, channel, message);
+        await relay(turn, conversation, message);
         stopThinking?.();
         stopThinking = undefined;
         await store.append(id, ...newMessages(session, seedLength));
@@ -103,19 +121,19 @@ function serve<In extends InboundMessage, Ch extends Channel>(
     } catch (error) {
       stopThinking?.();
       const err = error instanceof Error ? error : new Error(String(error));
-      if (options.onError) await options.onError(err, channel, message);
-      else await defaultError(err, channel);
+      if (options.onError) await options.onError(err, conversation, message);
+      else await defaultError(err, conversation);
     }
   }
 
-  function handler(message: In, channel: Ch): void {
+  function handler(message: In, conversation: Conv): void {
     const id = keyOf(message);
     // Enqueue synchronously so same-conversation messages keep arrival order.
     const prior = queues.get(id) ?? Promise.resolve();
     const next = prior
-      .then(() => runTurn(message, channel, id))
+      .then(() => runTurn(message, conversation, id))
       .catch((error: unknown) => {
-        console.error(`[gateways] ${gateway.name} ${id}:`, error);
+        console.error(`[channels] ${channel.name} ${id}:`, error);
       });
     queues.set(id, next);
     void next.finally(() => {
@@ -123,14 +141,14 @@ function serve<In extends InboundMessage, Ch extends Channel>(
     });
   }
 
-  const opened = Promise.resolve(gateway.open(handler));
+  const opened = Promise.resolve(channel.open(handler));
   opened.catch((error: unknown) => {
-    console.error(`[gateways] ${gateway.name} failed to open:`, error);
+    console.error(`[channels] ${channel.name} failed to open:`, error);
   });
 
   function notWebhook(): Promise<Response> {
     return Promise.resolve(
-      new Response('gateway is not in webhook mode', { status: 404 }),
+      new Response('channel is not in webhook mode', { status: 404 }),
     );
   }
 
@@ -139,10 +157,10 @@ function serve<In extends InboundMessage, Ch extends Channel>(
       const unsub = await opened.catch(() => undefined);
       if (unsub) await unsub();
     },
-    handle: gateway.handle
-      ? (req: Request): Promise<Response> => gateway.handle!(req)
+    handle: channel.handle
+      ? (req: Request): Promise<Response> => channel.handle!(req)
       : notWebhook,
   };
 }
 
-export { serve, type GatewayRuntime, type ServeOptions };
+export { serve, type ChannelRuntime, type ServeOptions };

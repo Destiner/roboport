@@ -3,8 +3,8 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { fileStore, memoryStore } from '@/channels';
 import type { Message } from '@/core';
-import { fileStore, memoryStore } from '@/gateways';
 
 function user(text: string): Message {
   return { role: 'user', content: text };

@@ -10,13 +10,13 @@ import {
 
 import type {
   Channel,
-  Gateway,
-  GatewayHandler,
+  ChannelHandler,
+  Conversation,
   InboundMessage,
   Relay,
 } from '../core';
 
-interface TelegramChannel extends Channel {
+interface TelegramConversation extends Conversation {
   chatId: number;
   client: TelegramClient;
   send(text: string, opts?: SendRichMessageOptions): Promise<void>;
@@ -27,7 +27,7 @@ type TelegramTransport =
   | { mode: 'polling' }
   | { mode: 'webhook'; secretToken: string };
 
-interface TelegramGatewayOptions {
+interface TelegramChannelOptions {
   token: string;
   // Defaults to long-polling (no public URL needed). Webhook mode exposes
   // `handle` to mount in your HTTP server.
@@ -37,7 +37,10 @@ interface TelegramGatewayOptions {
   botUsername?: string;
 }
 
-interface TelegramGateway extends Gateway<InboundMessage, TelegramChannel> {
+interface TelegramChannel extends Channel<
+  InboundMessage,
+  TelegramConversation
+> {
   client: TelegramClient;
 }
 
@@ -92,11 +95,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
+function telegramChannel(options: TelegramChannelOptions): TelegramChannel {
   const client = new TelegramClient(options.token);
   const transport: TelegramTransport = options.transport ?? { mode: 'polling' };
 
-  function channelFor(message: TelegramMessage): TelegramChannel {
+  function conversationFor(message: TelegramMessage): TelegramConversation {
     const chatId = message.chat.id;
     const threadId = message.message_thread_id;
     return {
@@ -134,13 +137,13 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
   }
 
   function deliver(
-    handler: GatewayHandler<InboundMessage, TelegramChannel>,
+    handler: ChannelHandler<InboundMessage, TelegramConversation>,
     message: TelegramMessage,
   ): void {
     void Promise.resolve(
-      handler(toInbound(message), channelFor(message)),
+      handler(toInbound(message), conversationFor(message)),
     ).catch((error: unknown) => {
-      console.error('[gateways] telegram handler error:', error);
+      console.error('[channels] telegram handler error:', error);
     });
   }
 
@@ -153,7 +156,7 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
       client,
       handle: receiver.handle,
       open(
-        handler: GatewayHandler<InboundMessage, TelegramChannel>,
+        handler: ChannelHandler<InboundMessage, TelegramConversation>,
       ): MaybePromise<Unsub> {
         const trigger = receiver.message(
           options.commands
@@ -169,7 +172,7 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
     name: 'telegram',
     client,
     open(
-      handler: GatewayHandler<InboundMessage, TelegramChannel>,
+      handler: ChannelHandler<InboundMessage, TelegramConversation>,
     ): MaybePromise<Unsub> {
       const controller = new AbortController();
       void (async (): Promise<void> => {
@@ -193,7 +196,7 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
             if (controller.signal.aborted) break;
             // Surface failures (e.g. a bad token) instead of silently retrying
             // forever, then back off before the next poll.
-            console.error('[gateways] telegram polling error:', error);
+            console.error('[channels] telegram polling error:', error);
             await sleep(POLL_BACKOFF_MS);
           }
         }
@@ -207,9 +210,9 @@ function telegramGateway(options: TelegramGatewayOptions): TelegramGateway {
 // tokens arrive (throttled), then commit the final reply with sendRichMessage.
 function stream(
   options: { throttleMs?: number } = {},
-): Relay<InboundMessage, TelegramChannel> {
+): Relay<InboundMessage, TelegramConversation> {
   const throttleMs = options.throttleMs ?? DRAFT_THROTTLE_MS;
-  return async (turn, channel): Promise<void> => {
+  return async (turn, conversation): Promise<void> => {
     const blocks: string[] = [];
     let current = '';
     let failure: Error | null = null;
@@ -231,7 +234,7 @@ function stream(
       inFlight = true;
       lastSentAt = Date.now();
       lastSentText = body;
-      void channel
+      void conversation
         .draft(body)
         .catch(() => {})
         .finally(() => {
@@ -253,15 +256,15 @@ function stream(
     }
     const reply = blocks.join('\n\n').trim();
     if (failure && !reply) throw failure;
-    await channel.send(reply || '(no response)');
+    await conversation.send(reply || '(no response)');
   };
 }
 
 export {
   stream,
-  telegramGateway,
+  telegramChannel,
   type TelegramChannel,
-  type TelegramGateway,
-  type TelegramGatewayOptions,
+  type TelegramChannelOptions,
+  type TelegramConversation,
   type TelegramTransport,
 };

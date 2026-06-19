@@ -28,7 +28,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./gateways": "./src/gateways/index.ts",
+    "./channels": "./src/channels/index.ts",
     "./harness": "./src/harness/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./models": "./src/models/index.ts",
