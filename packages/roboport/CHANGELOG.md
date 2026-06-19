@@ -1,5 +1,11 @@
 # roboport
 
+## 0.7.0
+
+### Minor Changes
+
+- [#69](https://github.com/Destiner/roboport/pull/69) [`dd90f29`](https://github.com/Destiner/roboport/commit/dd90f2966ffaac421a9c096e9f5fdbd80a47f68e) Thanks [@Destiner](https://github.com/Destiner)! - Rename the `gateways` concept to `channels`. The `roboport/gateways` subpath is now `roboport/channels`, `telegramGateway` is `telegramChannel`, and the `Gateway`/`Channel` pair is renamed to `Channel`/`Conversation` (`GatewayHandler` → `ChannelHandler`, `GatewayRuntime` → `ChannelRuntime`, `TelegramGateway` → `TelegramChannel`, `TelegramGatewayOptions` → `TelegramChannelOptions`, the per-conversation reply handle `TelegramChannel` → `TelegramConversation`).
+
 ## 0.6.0
 
 ### Minor Changes
