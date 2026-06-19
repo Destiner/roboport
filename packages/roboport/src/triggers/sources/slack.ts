@@ -218,7 +218,7 @@ interface SlackPostMessageResult {
   ts: string;
 }
 
-// Carries the stable Slack `error` code so callers (and a future gateway) can
+// Carries the stable Slack `error` code so callers (and a future channel) can
 // branch on `channel_not_found` vs. retryable throttling without parsing the
 // message. On HTTP 429 `code` is `rate_limited` and `retryAfter` is the
 // `Retry-After` delay in seconds.
@@ -244,7 +244,7 @@ class SlackApiError extends Error {
 }
 
 // Outbound Web API client. Colocated with the receiver so a Slack app (or a
-// future gateway) can reply, stream-edit, react, and link back without pulling
+// future channel) can reply, stream-edit, react, and link back without pulling
 // in the MCP preset.
 class SlackClient {
   private readonly token: string;

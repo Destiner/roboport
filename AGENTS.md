@@ -23,11 +23,11 @@ Minimal TypeScript framework for building LLM agents.
 
 Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable services.
 
-- `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `gateways`, `harness`, `mcp`, `models`, `skills`, `triggers`
+- `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `channels`, `harness`, `mcp`, `models`, `skills`, `triggers`
   - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` / `Session` primitives, plus provider-agnostic message and stream event types
   - `src/models/` - `Model` adapters; OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
-  - `src/gateways/` - Gateway primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
+  - `src/channels/` - Channel primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
   - `src/harness/` - `Harness` bundle, presets, and reusable tools in `tools.ts` (file and shell tools delegate to the `shared.ts` helpers)
   - `src/skills/` - Opt-in skill bundle; each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitives, webhook receivers, and provider clients
@@ -42,7 +42,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 - Deferred tools (`deferred: true`) are surfaced to the model via a `ToolSearch`-style flow; the loop reads them from the registry in `packages/roboport/src/core/tool.ts`.
 - Agents and sessions can set `cwd` to scope a run to a workspace, and `agent.session({ systemExtension })` appends per-session instructions to the system prompt; built-in harness shell/search tools default to `ToolContext.cwd` (`packages/roboport/src/core/agent.ts`, `packages/roboport/src/core/tool.ts`).
 - Trigger handlers registered with `Agent.on` receive the event and call `agent.session().send(...)` when they want to run the agent (`packages/roboport/src/core/agent.ts`).
-- Telegram gateway replies/drafts use rich Markdown messages; `TelegramClient.sendRichMessage(...)` and `sendRichMessageDraft(...)` do not auto-split and must stay within `MAX_RICH_MESSAGE_LENGTH` (`packages/roboport/src/triggers/sources/telegram.ts`).
+- Telegram channel replies/drafts use rich Markdown messages; `TelegramClient.sendRichMessage(...)` and `sendRichMessageDraft(...)` do not auto-split and must stay within `MAX_RICH_MESSAGE_LENGTH` (`packages/roboport/src/triggers/sources/telegram.ts`).
 - The root `roboport` export re-exports core primitives and message/session/tool registry types from `packages/roboport/src/core/` (`packages/roboport/src/index.ts`).
 - The `roboport/mcp` subpath exports server presets plus the generic `Mcp` client, transport config types, auth providers, and OAuth storage helpers (`packages/roboport/src/mcp/index.ts`).
 - Every `Model` adapter export uses a `*Model` class name, extends the abstract class in `packages/roboport/src/core/model.ts`, implements `streamMessage(...)`, and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 and later use adaptive thinking instead of budget tokens.

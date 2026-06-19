@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 
-import type { Turn } from '@/core';
 import {
   stream,
-  telegramGateway,
+  telegramChannel,
   type InboundMessage,
-  type TelegramChannel,
-} from '@/gateways';
+  type TelegramConversation,
+} from '@/channels';
+import type { Turn } from '@/core';
 import {
   TelegramClient,
   type TelegramMessage,
@@ -42,18 +42,18 @@ async function* fakeTurn(events: unknown[]): AsyncGenerator<unknown> {
   for (const event of events) yield event;
 }
 
-describe('telegramGateway (webhook)', () => {
+describe('telegramChannel (webhook)', () => {
   test('maps an inbound update onto an InboundMessage', async () => {
-    const gateway = telegramGateway({
+    const channel = telegramChannel({
       token: 't',
       transport: { mode: 'webhook', secretToken: SECRET },
     });
     const received: InboundMessage[] = [];
-    await gateway.open((message) => {
+    await channel.open((message) => {
       received.push(message);
     });
 
-    await gateway.handle!(
+    await channel.handle!(
       makeRequest({ update_id: 1, message: privateMessage() }),
     );
 
@@ -67,31 +67,31 @@ describe('telegramGateway (webhook)', () => {
   });
 });
 
-describe('TelegramChannel', () => {
+describe('TelegramConversation', () => {
   afterEach(() => {
     spyOn(globalThis, 'fetch').mockRestore();
   });
 
-  async function captureChannel(
+  async function captureConversation(
     overrides: Partial<TelegramMessage> = {},
-  ): Promise<TelegramChannel> {
-    const gateway = telegramGateway({
+  ): Promise<TelegramConversation> {
+    const channel = telegramChannel({
       token: 't',
       transport: { mode: 'webhook', secretToken: SECRET },
     });
-    let channel: TelegramChannel | null = null;
-    await gateway.open((_message, ch) => {
-      channel = ch;
+    let conversation: TelegramConversation | null = null;
+    await channel.open((_message, conv) => {
+      conversation = conv;
     });
-    await gateway.handle!(
+    await channel.handle!(
       makeRequest({ update_id: 1, message: privateMessage(overrides) }),
     );
-    if (!channel) throw new Error('channel was not delivered');
-    return channel;
+    if (!conversation) throw new Error('conversation was not delivered');
+    return conversation;
   }
 
   test('send relays through the client sendRichMessage API', async () => {
-    const channel = await captureChannel();
+    const conversation = await captureConversation();
     let body: Record<string, unknown> = {};
     spyOn(globalThis, 'fetch').mockImplementation((async (
       _url: string,
@@ -104,7 +104,7 @@ describe('TelegramChannel', () => {
       );
     }) as never);
 
-    await channel.send('reply');
+    await conversation.send('reply');
     expect(body).toMatchObject({
       chat_id: 42,
       rich_message: { markdown: 'reply' },
@@ -112,8 +112,8 @@ describe('TelegramChannel', () => {
   });
 
   test('keys per forum topic and routes replies back to it', async () => {
-    const channel = await captureChannel({ message_thread_id: 9 });
-    expect(channel.conversationId).toBe('42:9');
+    const conversation = await captureConversation({ message_thread_id: 9 });
+    expect(conversation.conversationId).toBe('42:9');
 
     let body: Record<string, unknown> = {};
     spyOn(globalThis, 'fetch').mockImplementation((async (
@@ -127,7 +127,7 @@ describe('TelegramChannel', () => {
       );
     }) as never);
 
-    await channel.send('reply');
+    await conversation.send('reply');
     expect(body).toMatchObject({
       chat_id: 42,
       rich_message: { markdown: 'reply' },
@@ -136,7 +136,7 @@ describe('TelegramChannel', () => {
   });
 
   test('draft relays through the client sendRichMessageDraft API', async () => {
-    const channel = await captureChannel();
+    const conversation = await captureConversation();
     let body: Record<string, unknown> = {};
     spyOn(globalThis, 'fetch').mockImplementation((async (
       _url: string,
@@ -148,7 +148,7 @@ describe('TelegramChannel', () => {
       });
     }) as never);
 
-    await channel.draft('partial');
+    await conversation.draft('partial');
     expect(body).toMatchObject({
       chat_id: 42,
       draft_id: 1,
@@ -160,14 +160,14 @@ describe('TelegramChannel', () => {
 describe('stream relay', () => {
   const message: InboundMessage = { id: '1', conversationId: '1', text: '' };
 
-  function captureChannel(): {
-    channel: TelegramChannel;
+  function captureConversation(): {
+    conversation: TelegramConversation;
     sent: string[];
     drafts: string[];
   } {
     const sent: string[] = [];
     const drafts: string[] = [];
-    const channel: TelegramChannel = {
+    const conversation: TelegramConversation = {
       conversationId: '1',
       chatId: 1,
       client: {} as TelegramClient,
@@ -178,28 +178,28 @@ describe('stream relay', () => {
         drafts.push(text);
       },
     };
-    return { channel, sent, drafts };
+    return { conversation, sent, drafts };
   }
 
   test('commits the assembled reply with sendMessage', async () => {
-    const { channel, sent } = captureChannel();
+    const { conversation, sent } = captureConversation();
     const turn = fakeTurn([
       { type: 'text-delta', text: 'Hel' },
       { type: 'text-delta', text: 'lo' },
       { type: 'text', text: 'Hello' },
     ]) as unknown as Turn;
 
-    await stream({ throttleMs: 0 })(turn, channel, message);
+    await stream({ throttleMs: 0 })(turn, conversation, message);
     expect(sent).toEqual(['Hello']);
   });
 
   test('rethrows a turn error when nothing was produced', async () => {
-    const { channel } = captureChannel();
+    const { conversation } = captureConversation();
     const turn = fakeTurn([
       { type: 'error', error: new Error('model exploded') },
     ]) as unknown as Turn;
 
-    await expect(stream()(turn, channel, message)).rejects.toThrow(
+    await expect(stream()(turn, conversation, message)).rejects.toThrow(
       'model exploded',
     );
   });

@@ -1,14 +1,14 @@
 import { describe, expect, spyOn, test } from 'bun:test';
 
-import { Agent, Model, type ModelStreamEvent, type SearchHit } from '@/core';
 import {
   memoryStore,
   serve,
   type Channel,
-  type Gateway,
-  type GatewayHandler,
+  type ChannelHandler,
+  type Conversation,
   type InboundMessage,
-} from '@/gateways';
+} from '@/channels';
+import { Agent, Model, type ModelStreamEvent, type SearchHit } from '@/core';
 
 class StubModel extends Model {
   private behavior: { reply?: string; throwError?: string };
@@ -51,30 +51,30 @@ function inbound(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return { id: '1', conversationId: 'c1', text: 'hello', ...overrides };
 }
 
-function makeFakeGateway(): {
-  gateway: Gateway<InboundMessage, Channel>;
+function makeFakeChannel(): {
+  channel: Channel<InboundMessage, Conversation>;
   deliver: (message: InboundMessage) => void;
   sent: string[];
 } {
-  let handler: GatewayHandler<InboundMessage, Channel> | null = null;
+  let handler: ChannelHandler<InboundMessage, Conversation> | null = null;
   const sent: string[] = [];
-  const gateway: Gateway<InboundMessage, Channel> = {
+  const channel: Channel<InboundMessage, Conversation> = {
     name: 'fake',
-    open(h: GatewayHandler<InboundMessage, Channel>): () => void {
+    open(h: ChannelHandler<InboundMessage, Conversation>): () => void {
       handler = h;
       return (): void => {};
     },
   };
   function deliver(message: InboundMessage): void {
-    const channel: Channel = {
+    const conversation: Conversation = {
       conversationId: message.conversationId,
       send: async (text: string): Promise<void> => {
         sent.push(text);
       },
     };
-    handler?.(message, channel);
+    handler?.(message, conversation);
   }
-  return { gateway, deliver, sent };
+  return { channel, deliver, sent };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -95,8 +95,8 @@ async function waitFor(
 describe('serve', () => {
   test('runs a turn, relays the reply, persists user + assistant', async () => {
     const store = memoryStore();
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent({ reply: 'hi there' }), gateway, { store });
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent({ reply: 'hi there' }), channel, { store });
 
     deliver(inbound({ text: 'hello' }));
     await waitFor(() => sent.length === 1);
@@ -110,8 +110,8 @@ describe('serve', () => {
 
   test('serializes turns per conversation in arrival order', async () => {
     const store = memoryStore();
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent({ reply: 'r' }), gateway, { store });
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent({ reply: 'r' }), channel, { store });
 
     deliver(inbound({ text: 'first' }));
     deliver(inbound({ text: 'second' }));
@@ -126,8 +126,8 @@ describe('serve', () => {
 
   test('authorize=false drops the message without replying or persisting', async () => {
     const store = memoryStore();
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent(), gateway, { store, authorize: (): boolean => false });
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent(), channel, { store, authorize: (): boolean => false });
 
     deliver(inbound());
     await sleep(50);
@@ -138,8 +138,8 @@ describe('serve', () => {
 
   test('prompt returning null skips the turn', async () => {
     const store = memoryStore();
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent(), gateway, { store, prompt: (): null => null });
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent(), channel, { store, prompt: (): null => null });
 
     deliver(inbound());
     await sleep(50);
@@ -150,8 +150,8 @@ describe('serve', () => {
 
   test('persists assistant turns across turns (memoryStore is not aliased)', async () => {
     const store = memoryStore();
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent({ reply: 'r' }), gateway, { store });
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent({ reply: 'r' }), channel, { store });
 
     deliver(inbound({ text: 'first' }));
     await waitFor(() => sent.length === 1);
@@ -169,8 +169,8 @@ describe('serve', () => {
 
   test('default error reply is generic and does not leak the raw message', async () => {
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    const { gateway, deliver, sent } = makeFakeGateway();
-    serve(stubAgent({ throwError: 'secret upstream detail' }), gateway, {});
+    const { channel, deliver, sent } = makeFakeChannel();
+    serve(stubAgent({ throwError: 'secret upstream detail' }), channel, {});
 
     deliver(inbound());
     await waitFor(() => sent.length === 1);
@@ -182,9 +182,9 @@ describe('serve', () => {
 
   test('onError receives a thrown turn error', async () => {
     const store = memoryStore();
-    const { gateway, deliver } = makeFakeGateway();
+    const { channel, deliver } = makeFakeChannel();
     const errors: string[] = [];
-    serve(stubAgent({ throwError: 'boom' }), gateway, {
+    serve(stubAgent({ throwError: 'boom' }), channel, {
       store,
       onError: (error: Error): void => {
         errors.push(error.message);

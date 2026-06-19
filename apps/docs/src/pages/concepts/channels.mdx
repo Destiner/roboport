@@ -1,0 +1,49 @@
+# Channels
+
+A channel is a two-way connection between a chat transport (Telegram, Slack, …) and an agent. Where a [trigger](/concepts/triggers) is one-way (it fires an event and forgets), a channel accepts inbound messages from the **transport** and uses a **conversation** handle to relay the answer back.
+
+Built-in channels:
+
+- Telegram: `telegramChannel`
+
+Use `serve` to bind an agent to a channel:
+
+```ts
+import { serve, telegramChannel } from 'roboport/channels';
+
+const bot = serve(
+  agent,
+  telegramChannel({ token: process.env.TELEGRAM_TOKEN }),
+);
+// later: await bot.stop();
+```
+
+## Transports
+
+Channels support two transports.
+
+By default, polling is used. Zero config, ideal for local development.
+
+You can also use webhooks, which are recommended in production:
+
+```ts
+const channel = telegramChannel({
+  token: process.env.TELEGRAM_TOKEN,
+  transport: {
+    mode: 'webhook',
+    secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+  },
+});
+const bot = serve(agent, channel);
+
+const route = '/webhooks/telegram';
+app.post(route, (c) => bot.handle(c.req.raw));
+await channel.client.setWebhook(`${publicUrl}${route}`, {
+  secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+  allowedUpdates: ['message'],
+});
+```
+
+## Custom channel
+
+A channel implements the `Channel` interface: `open(handler)` wires the transport and returns an unsubscribe (mirroring a trigger's `start`), `handle?(req)` is present for webhook transports the host mounts in an HTTP server, and `relay?` sets the default reply strategy. Each inbound message arrives with a `Conversation` carrying `send(text)` and an optional `thinking()` presence indicator. `telegramChannel` is the reference implementation.
