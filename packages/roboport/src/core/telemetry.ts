@@ -6,9 +6,9 @@
 
 import {
   type Attributes,
-  type Context,
   type Counter,
   type Histogram,
+  type Link,
   type Span,
   SpanKind,
   SpanStatusCode,
@@ -104,6 +104,7 @@ function captureContent(): boolean {
 interface SpanOptions {
   kind?: SpanKind;
   attributes?: Attributes;
+  links?: Link[];
 }
 
 // Runs `fn` inside an active span: child spans created within (including across
@@ -117,7 +118,11 @@ async function span<T>(
 ): Promise<T> {
   return tracer().startActiveSpan(
     name,
-    { kind: options.kind ?? SpanKind.INTERNAL, attributes: options.attributes },
+    {
+      kind: options.kind ?? SpanKind.INTERNAL,
+      attributes: options.attributes,
+      links: options.links,
+    },
     async (active) => {
       try {
         return await fn(active);
@@ -139,10 +144,18 @@ async function span<T>(
 // `startActiveSpan` callback. The caller owns `end()`; `failSpan` records an
 // error before ending.
 function startSpan(name: string, options: SpanOptions = {}): Span {
-  return tracer().startSpan(name, {
-    kind: options.kind ?? SpanKind.INTERNAL,
-    attributes: options.attributes,
-  });
+  // Pass the active context explicitly: the OTel JS API starts spans against
+  // ROOT_CONTEXT otherwise, which would detach this span into its own trace
+  // instead of nesting it under the enclosing active span.
+  return tracer().startSpan(
+    name,
+    {
+      kind: options.kind ?? SpanKind.INTERNAL,
+      attributes: options.attributes,
+      links: options.links,
+    },
+    context.active(),
+  );
 }
 
 function failSpan(active: Span, error: unknown): void {
@@ -151,15 +164,18 @@ function failSpan(active: Span, error: unknown): void {
   active.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
 }
 
-// Extracts an upstream trace context from inbound carrier headers (W3C
-// `traceparent`/`baggage`), so an ingress span links to the caller's trace.
-function extract(carrier: Record<string, string | undefined>): Context {
-  return propagation.extract(context.active(), carrier);
-}
-
-// Runs `fn` with `ctx` as the active context.
-function withContext<T>(ctx: Context, fn: () => T): T {
-  return context.with(ctx, fn);
+// Builds a span link to the upstream trace carried in inbound headers (W3C
+// `traceparent`). Used for ingress spans (webhooks): the span stays a root of
+// roboport's own trace and *links* to the caller's trace rather than nesting
+// under it — the right topology when handling is fire-and-forget and shouldn't
+// be attributed to the caller's trace. Returns undefined when no valid upstream
+// context is present.
+function linkFromCarrier(
+  carrier: Record<string, string | undefined>,
+): Link | undefined {
+  const upstream = propagation.extract(context.active(), carrier);
+  const spanContext = trace.getSpanContext(upstream);
+  return spanContext ? { context: spanContext } : undefined;
 }
 
 const telemetry = {
@@ -172,8 +188,7 @@ const telemetry = {
   recordTurnDuration,
   recordToolError,
   captureContent,
-  extract,
-  withContext,
+  linkFromCarrier,
 } as const;
 
 // eslint-disable-next-line import-x/prefer-default-export

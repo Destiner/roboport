@@ -184,49 +184,49 @@ class SlackReceiver {
         event_id: payload.event_id,
         event_time: payload.event_time,
       };
-      // Ingress span linked to any upstream trace context. Dispatch is
-      // fire-and-forget, so this marks receipt, not the agent turn it triggers.
-      void telemetry.withContext(
-        telemetry.extract(Object.fromEntries(req.headers)),
-        () =>
-          telemetry.span(
-            'trigger.receive',
-            {
-              kind: telemetry.SpanKind.SERVER,
-              attributes: {
-                'trigger.source': 'slack',
-                ...(payload.event_id
-                  ? { 'trigger.event.id': payload.event_id }
-                  : {}),
-              },
-            },
-
-            async () => {
-              switch (event.type) {
-                case 'app_mention':
-                  dispatch(this.appMentionBus, {
-                    ...(event as unknown as SlackAppMention),
-                    ...eventContext,
-                  });
-                  break;
-                case 'message':
-                  dispatch(this.messageBus, {
-                    ...(event as unknown as SlackMessage),
-                    ...eventContext,
-                  });
-                  break;
-                case 'reaction_added':
-                case 'reaction_removed':
-                  dispatch(this.reactionBus, {
-                    ...(event as unknown as SlackReaction),
-                    ...eventContext,
-                  });
-                  break;
-                default:
-                  break;
-              }
-            },
-          ),
+      // Ingress span linked to any upstream trace. Dispatch is fire-and-forget,
+      // so this marks receipt, not the agent turn it triggers, and stays a root
+      // of roboport's own trace — linked to, not parented by, the caller.
+      const upstream = telemetry.linkFromCarrier(
+        Object.fromEntries(req.headers),
+      );
+      void telemetry.span(
+        'trigger.receive',
+        {
+          kind: telemetry.SpanKind.SERVER,
+          attributes: {
+            'trigger.source': 'slack',
+            ...(payload.event_id
+              ? { 'trigger.event.id': payload.event_id }
+              : {}),
+          },
+          ...(upstream ? { links: [upstream] } : {}),
+        },
+        async () => {
+          switch (event.type) {
+            case 'app_mention':
+              dispatch(this.appMentionBus, {
+                ...(event as unknown as SlackAppMention),
+                ...eventContext,
+              });
+              break;
+            case 'message':
+              dispatch(this.messageBus, {
+                ...(event as unknown as SlackMessage),
+                ...eventContext,
+              });
+              break;
+            case 'reaction_added':
+            case 'reaction_removed':
+              dispatch(this.reactionBus, {
+                ...(event as unknown as SlackReaction),
+                ...eventContext,
+              });
+              break;
+            default:
+              break;
+          }
+        },
       );
     }
 
@@ -279,44 +279,53 @@ class SlackClient {
     this.baseUrl = (opts?.baseUrl ?? SLACK_API_URL).replace(/\/+$/, '');
   }
 
-  private async call<T>(
-    method: string,
-    params: Record<string, unknown>,
-  ): Promise<T> {
-    const body = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined || value === null) continue;
-      body.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-    }
-    const res = await fetch(`${this.baseUrl}/${method}`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.token}`,
-        'content-type': 'application/x-www-form-urlencoded',
+  private call<T>(method: string, params: Record<string, unknown>): Promise<T> {
+    return telemetry.span(
+      'trigger.send',
+      {
+        kind: telemetry.SpanKind.CLIENT,
+        attributes: { 'trigger.source': 'slack', 'rpc.method': method },
       },
-      body,
-    });
-    // Throttling: Slack sends HTTP 429 with a `Retry-After` (seconds) header.
-    if (res.status === 429) {
-      const retryAfter = Number(res.headers.get('retry-after'));
-      throw new SlackApiError({
-        method,
-        code: 'rate_limited',
-        status: 429,
-        retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined,
-      });
-    }
-    // Otherwise Slack returns HTTP 200 with `{ ok: false, error }` for
-    // API-level failures.
-    const data = (await res.json()) as { ok: boolean; error?: string } & T;
-    if (!data.ok) {
-      throw new SlackApiError({
-        method,
-        code: data.error ?? 'unknown_error',
-        status: res.status,
-      });
-    }
-    return data;
+      async (): Promise<T> => {
+        const body = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+          if (value === undefined || value === null) continue;
+          body.set(
+            key,
+            typeof value === 'string' ? value : JSON.stringify(value),
+          );
+        }
+        const res = await fetch(`${this.baseUrl}/${method}`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${this.token}`,
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          body,
+        });
+        // Throttling: Slack sends HTTP 429 with a `Retry-After` (seconds) header.
+        if (res.status === 429) {
+          const retryAfter = Number(res.headers.get('retry-after'));
+          throw new SlackApiError({
+            method,
+            code: 'rate_limited',
+            status: 429,
+            retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined,
+          });
+        }
+        // Otherwise Slack returns HTTP 200 with `{ ok: false, error }` for
+        // API-level failures.
+        const data = (await res.json()) as { ok: boolean; error?: string } & T;
+        if (!data.ok) {
+          throw new SlackApiError({
+            method,
+            code: data.error ?? 'unknown_error',
+            status: res.status,
+          });
+        }
+        return data;
+      },
+    );
   }
 
   postMessage(

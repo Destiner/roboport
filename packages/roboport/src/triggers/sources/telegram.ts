@@ -216,29 +216,29 @@ class TelegramReceiver {
       return new Response('duplicate', { status: 200 });
     }
 
-    // Ingress span linked to any upstream trace context the webhook carries.
-    // Dispatch is fire-and-forget (the HTTP response must not wait on agent
-    // work), so this span marks receipt rather than wrapping the agent turn.
+    // Ingress span linked to any upstream trace the webhook carries. Dispatch
+    // is fire-and-forget (the HTTP response must not wait on agent work), so
+    // this span marks receipt rather than wrapping the agent turn, and stays a
+    // root of roboport's own trace — linked to, not parented by, the caller.
     const inbound = update.message ?? update.edited_message;
     if (inbound) {
       const bus = update.message ? this.messageBus : this.editedMessageBus;
-      void telemetry.withContext(
-        telemetry.extract(Object.fromEntries(req.headers)),
-        () =>
-          telemetry.span(
-            'trigger.receive',
-            {
-              kind: telemetry.SpanKind.SERVER,
-              attributes: {
-                'trigger.source': 'telegram',
-                'trigger.update.id': update.update_id,
-              },
-            },
-
-            async () => {
-              dispatch(bus, inbound);
-            },
-          ),
+      const upstream = telemetry.linkFromCarrier(
+        Object.fromEntries(req.headers),
+      );
+      void telemetry.span(
+        'trigger.receive',
+        {
+          kind: telemetry.SpanKind.SERVER,
+          attributes: {
+            'trigger.source': 'telegram',
+            'trigger.update.id': update.update_id,
+          },
+          ...(upstream ? { links: [upstream] } : {}),
+        },
+        async () => {
+          dispatch(bus, inbound);
+        },
       );
     }
 
