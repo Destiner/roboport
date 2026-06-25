@@ -1,6 +1,6 @@
 # Telemetry
 
-Roboport is instrumented with [OpenTelemetry](https://opentelemetry.io). It emits traces and metrics against the global `@opentelemetry/api`, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/).
+Roboport is instrumented with [OpenTelemetry](https://opentelemetry.io). It emits traces and metrics against the global `@opentelemetry/api`. Span names and attributes follow the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/); metrics are roboport-namespaced (`roboport.gen_ai.*`) since their shapes differ from the convention's.
 
 ## Setup
 
