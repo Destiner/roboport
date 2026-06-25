@@ -106,10 +106,6 @@ interface SpanOptions {
   kind?: SpanKind;
   attributes?: Attributes;
   links?: Link[];
-  // Start the span against ROOT_CONTEXT instead of the ambient active context,
-  // making it a new trace root. Used for webhook ingress spans, which must not
-  // become children of an upstream/server trace — they link to it instead.
-  root?: boolean;
 }
 
 // Runs `fn` inside an active span: child spans created within (including across
@@ -121,34 +117,26 @@ async function span<T>(
   options: SpanOptions,
   fn: (span: Span) => Promise<T>,
 ): Promise<T> {
-  function start(): Promise<T> {
-    return tracer().startActiveSpan(
-      name,
-      {
-        kind: options.kind ?? SpanKind.INTERNAL,
-        attributes: options.attributes,
-        links: options.links,
-      },
-      async (active) => {
-        try {
-          return await fn(active);
-        } catch (error) {
-          const err = error instanceof Error ? error : new Error(String(error));
-          active.recordException(err);
-          active.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err.message,
-          });
-          throw error;
-        } finally {
-          active.end();
-        }
-      },
-    );
-  }
-  // `root` detaches from the ambient context so the span starts a new trace;
-  // `startActiveSpan` parents to whatever is active, so we make ROOT active.
-  return options.root ? context.with(ROOT_CONTEXT, start) : start();
+  return tracer().startActiveSpan(
+    name,
+    {
+      kind: options.kind ?? SpanKind.INTERNAL,
+      attributes: options.attributes,
+      links: options.links,
+    },
+    async (active) => {
+      try {
+        return await fn(active);
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        active.recordException(err);
+        active.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+        throw error;
+      } finally {
+        active.end();
+      }
+    },
+  );
 }
 
 // Starts a span as a child of the active context without making it active.
@@ -177,6 +165,37 @@ function failSpan(active: Span, error: unknown): void {
   active.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
 }
 
+// Records a webhook-ingress span around a fire-and-forget `dispatch`. The span
+// is its own trace root (parented to ROOT_CONTEXT), linked to the upstream
+// `traceparent` via `options.links`, and is *never made active*. `dispatch`
+// runs under a detached root context, so subscribers that schedule work with
+// the ambient context (e.g. `Agent.start`'s fire-and-forget handler) capture a
+// clean root rather than nesting their `agent.turn` under this span or the
+// caller's server trace.
+function ingress(
+  name: string,
+  options: SpanOptions,
+  dispatch: () => void,
+): void {
+  const active = tracer().startSpan(
+    name,
+    {
+      kind: options.kind ?? SpanKind.SERVER,
+      attributes: options.attributes,
+      links: options.links,
+    },
+    ROOT_CONTEXT,
+  );
+  try {
+    context.with(ROOT_CONTEXT, dispatch);
+  } catch (error) {
+    failSpan(active, error);
+    throw error;
+  } finally {
+    active.end();
+  }
+}
+
 // Builds a span link to the upstream trace carried in inbound headers (W3C
 // `traceparent`). Used for ingress spans (webhooks): the span stays a root of
 // roboport's own trace and *links* to the caller's trace rather than nesting
@@ -200,6 +219,7 @@ const telemetry = {
   span,
   startSpan,
   failSpan,
+  ingress,
   recordTokens,
   recordTurnDuration,
   recordToolError,

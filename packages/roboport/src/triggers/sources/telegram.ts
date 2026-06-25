@@ -226,20 +226,16 @@ class TelegramReceiver {
       const upstream = telemetry.linkFromCarrier(
         Object.fromEntries(req.headers),
       );
-      void telemetry.span(
+      telemetry.ingress(
         'trigger.receive',
         {
-          kind: telemetry.SpanKind.SERVER,
           attributes: {
             'trigger.source': 'telegram',
             'trigger.update.id': update.update_id,
           },
-          root: true,
           ...(upstream ? { links: [upstream] } : {}),
         },
-        async () => {
-          dispatch(bus, inbound);
-        },
+        () => dispatch(bus, inbound),
       );
     }
 

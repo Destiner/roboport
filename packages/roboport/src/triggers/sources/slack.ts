@@ -190,20 +190,18 @@ class SlackReceiver {
       const upstream = telemetry.linkFromCarrier(
         Object.fromEntries(req.headers),
       );
-      void telemetry.span(
+      telemetry.ingress(
         'trigger.receive',
         {
-          kind: telemetry.SpanKind.SERVER,
           attributes: {
             'trigger.source': 'slack',
             ...(payload.event_id
               ? { 'trigger.event.id': payload.event_id }
               : {}),
           },
-          root: true,
           ...(upstream ? { links: [upstream] } : {}),
         },
-        async () => {
+        () => {
           switch (event.type) {
             case 'app_mention':
               dispatch(this.appMentionBus, {
