@@ -20,6 +20,11 @@ type LiteralUnion<T extends string> = T | (string & {});
 type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 abstract class Model {
+  // Adapter-provided model identifier (e.g. "claude-opus-4-8"). Declared here
+  // for telemetry to read uniformly; `declare` emits no runtime field, so it
+  // never shadows the value each adapter assigns in its constructor.
+  declare modelName?: string;
+
   abstract streamMessage(
     params: CreateMessageParams,
   ): AsyncIterable<ModelStreamEvent>;

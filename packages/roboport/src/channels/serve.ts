@@ -1,4 +1,5 @@
 import { Agent, Session, type Message, type TextPart, type Turn } from '@/core';
+import { telemetry } from '@/core/telemetry';
 
 import type { Channel, Conversation, InboundMessage, Relay } from './core';
 import { memoryStore, type ConversationStore } from './store';
@@ -48,7 +49,11 @@ async function bufferReplies(
   }
   const reply = blocks.join('\n\n').trim();
   if (failure && !reply) throw failure;
-  await conversation.send(reply || '(no response)');
+  await telemetry.span(
+    'channel.send',
+    { kind: telemetry.SpanKind.PRODUCER },
+    () => conversation.send(reply || '(no response)'),
+  );
 }
 
 // Keep the user-facing default generic — raw errors can carry provider response
@@ -77,7 +82,21 @@ function serve<In extends InboundMessage, Conv extends Conversation>(
     options.relay ?? channel.relay ?? bufferReplies;
   const queues = new Map<string, Promise<unknown>>();
 
-  async function runTurn(
+  function runTurn(message: In, conversation: Conv, id: string): Promise<void> {
+    return telemetry.span(
+      'channel.receive',
+      {
+        kind: telemetry.SpanKind.CONSUMER,
+        attributes: {
+          'channel.name': channel.name,
+          'channel.conversation.id': id,
+        },
+      },
+      () => runTurnInner(message, conversation, id),
+    );
+  }
+
+  async function runTurnInner(
     message: In,
     conversation: Conv,
     id: string,

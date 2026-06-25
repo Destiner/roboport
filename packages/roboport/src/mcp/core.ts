@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 
 import { Tool, type McpClient } from '@/core';
+import { telemetry } from '@/core/telemetry';
 
 import type { AuthProvider } from './auth';
 
@@ -344,25 +345,37 @@ class Mcp implements McpClient {
   }
 
   async connect(): Promise<Tool[]> {
-    const connection: Transport =
-      this.transport.type === 'stdio'
-        ? new StdioTransport(this.transport)
-        : new HttpTransport(this.transport);
+    return telemetry.span(
+      'mcp.connect',
+      {
+        kind: telemetry.SpanKind.CLIENT,
+        attributes: {
+          'mcp.server.name': this.name,
+          'mcp.transport': this.transport.type,
+        },
+      },
+      async (): Promise<Tool[]> => {
+        const connection: Transport =
+          this.transport.type === 'stdio'
+            ? new StdioTransport(this.transport)
+            : new HttpTransport(this.transport);
 
-    this.connection = connection;
-    await connection.start();
+        this.connection = connection;
+        await connection.start();
 
-    await connection.request('initialize', {
-      protocolVersion: PROTOCOL_VERSION,
-      capabilities: {},
-      clientInfo: { name: 'roboport', version: '0.1.0' },
-    });
-    await connection.notify('notifications/initialized');
+        await connection.request('initialize', {
+          protocolVersion: PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: 'roboport', version: '0.1.0' },
+        });
+        await connection.notify('notifications/initialized');
 
-    const result = (await connection.request('tools/list')) as {
-      tools: RemoteTool[];
-    };
-    return result.tools.map((remote) => this.wrap(remote));
+        const result = (await connection.request('tools/list')) as {
+          tools: RemoteTool[];
+        };
+        return result.tools.map((remote) => this.wrap(remote));
+      },
+    );
   }
 
   async disconnect(): Promise<void> {
@@ -378,18 +391,30 @@ class Mcp implements McpClient {
       description: remote.description ?? `${this.name}.${remote.name}`,
       jsonSchema: remote.inputSchema,
       deferred: this.deferred,
-      execute: async (input): Promise<string> => {
-        if (!this.connection) {
-          throw new Error(`MCP "${this.name}" is not connected.`);
-        }
-        const result = (await this.connection.request('tools/call', {
-          name: remote.name,
-          arguments: input,
-        })) as ToolCallResult;
-        const text = formatContent(result.content);
-        if (result.isError) throw new Error(text);
-        return text;
-      },
+      execute: (input): Promise<string> =>
+        telemetry.span(
+          'mcp.request',
+          {
+            kind: telemetry.SpanKind.CLIENT,
+            attributes: {
+              'mcp.server.name': this.name,
+              'mcp.method.name': 'tools/call',
+              [telemetry.ATTR.toolName]: remote.name,
+            },
+          },
+          async (): Promise<string> => {
+            if (!this.connection) {
+              throw new Error(`MCP "${this.name}" is not connected.`);
+            }
+            const result = (await this.connection.request('tools/call', {
+              name: remote.name,
+              arguments: input,
+            })) as ToolCallResult;
+            const text = formatContent(result.content);
+            if (result.isError) throw new Error(text);
+            return text;
+          },
+        ),
     });
   }
 }

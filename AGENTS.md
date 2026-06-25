@@ -24,7 +24,7 @@ Minimal TypeScript framework for building LLM agents.
 Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable services.
 
 - `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `channels`, `harness`, `mcp`, `models`, `skills`, `triggers`
-  - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` / `Session` primitives, plus provider-agnostic message and stream event types
+  - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` / `Session` primitives, plus provider-agnostic message and stream event types; `telemetry.ts` is the internal OpenTelemetry wrapper (span/metric helpers over the global `@opentelemetry/api`)
   - `src/models/` - `Model` adapters; OpenAI Codex auth lives in `openai-codex-auth.ts`
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
   - `src/channels/` - Channel primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
@@ -46,6 +46,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 - The root `roboport` export re-exports core primitives and message/session/tool registry types from `packages/roboport/src/core/` (`packages/roboport/src/index.ts`).
 - The `roboport/mcp` subpath exports server presets plus the generic `Mcp` client, transport config types, auth providers, and OAuth storage helpers (`packages/roboport/src/mcp/index.ts`).
 - Every `Model` adapter export uses a `*Model` class name, extends the abstract class in `packages/roboport/src/core/model.ts`, implements `streamMessage(...)`, and converts to/from the wire format internally, including provider-specific `ThinkingLevel` mappings; Anthropic Opus 4.7 and later use adaptive thinking instead of budget tokens.
+- OpenTelemetry is emitted against the global `@opentelemetry/api` (a direct dependency, externalized in the build like `zod`); roboport never registers an SDK, so it is a no-op until the consumer brings one. All instrumentation goes through the `telemetry` helper in `packages/roboport/src/core/telemetry.ts` (spans `agent.turn`/`chat.model`/`tool.execute`/`mcp.*`/`channel.*`/`trigger.*`); content capture is gated by `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`.
 
 ## Conventions
 

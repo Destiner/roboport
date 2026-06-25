@@ -1,0 +1,73 @@
+# Telemetry
+
+Roboport is instrumented with [OpenTelemetry](https://opentelemetry.io). It emits traces and metrics against the global `@opentelemetry/api`, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). It never registers an SDK or exporter itself — you bring your own. With no SDK registered the API is a no-op, so there is nothing to configure and no overhead unless you opt in.
+
+## Setup
+
+Register an SDK with an OTLP exporter pointed at your collector. The export URL lives on the exporter you configure — set it once, before importing your agent code.
+
+```ts
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+
+new NodeSDK({
+  traceExporter: new OTLPTraceExporter({
+    url: 'https://collector.example.com/v1/traces',
+  }),
+  metricReader: new PeriodicExportingMetricReader({
+    exporter: new OTLPMetricExporter({
+      url: 'https://collector.example.com/v1/metrics',
+    }),
+  }),
+}).start();
+
+// Import and run your agent after the SDK is started.
+const { Agent } = await import('roboport');
+```
+
+Install the SDK packages yourself — they are not roboport dependencies:
+
+```bash
+bun add @opentelemetry/sdk-node @opentelemetry/exporter-trace-otlp-proto \
+  @opentelemetry/exporter-metrics-otlp-proto @opentelemetry/sdk-metrics
+```
+
+The `http/protobuf` exporter shown here is the OpenTelemetry default and the safest choice for an arbitrary collector. `@opentelemetry/exporter-*-otlp-http` (JSON) and `@opentelemetry/exporter-*-otlp-grpc` (gRPC) are drop-in alternatives.
+
+## Spans
+
+| Span              | Emitted around                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| `agent.turn`      | A full agent turn (the model/tool loop). Root of an agent run.                                    |
+| `chat.model`      | Each model request. Carries the request model, finish reason, and token usage.                    |
+| `tool.execute`    | Each tool execution. Carries the tool name and call id.                                           |
+| `mcp.connect`     | Connecting to an MCP server and listing its tools.                                                |
+| `mcp.request`     | An MCP `tools/call` request.                                                                      |
+| `channel.receive` | An inbound channel message handled by `serve`. The agent turn nests under it.                     |
+| `channel.send`    | A buffered reply sent back over a channel.                                                        |
+| `trigger.receive` | A webhook delivery (Telegram, Slack). Links to any upstream trace context in the request headers. |
+| `trigger.send`    | An outbound provider API call.                                                                    |
+
+Spans nest along the awaited call chain: `channel.receive` → `agent.turn` → `chat.model` / `tool.execute` → `mcp.request`, given the AsyncLocalStorage-based context manager that `NodeSDK` registers by default.
+
+`trigger.receive` is an exception: trigger handlers run fire-and-forget so the webhook can return `200` immediately, so the agent turn it kicks off is a separate trace rather than a child. The receive span still links to upstream trace context (W3C `traceparent`) extracted from the request headers.
+
+## Metrics
+
+| Metric                          | Type      | Description                                                                                |
+| ------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `roboport.gen_ai.client.tokens` | Counter   | Tokens consumed, tagged `gen_ai.token.type` (`input`/`output`) and `gen_ai.request.model`. |
+| `roboport.gen_ai.turn.duration` | Histogram | Agent turn duration, in seconds.                                                           |
+| `roboport.gen_ai.tool.errors`   | Counter   | Tool executions that ended in an error.                                                    |
+
+## Capturing prompt and tool content
+
+By default spans carry only metadata — token counts, model name, finish reason, tool name. To also attach prompt/completion text and tool arguments/results, set the conventional env var:
+
+```bash
+OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+```
+
+Leave it off in environments where message content is sensitive.

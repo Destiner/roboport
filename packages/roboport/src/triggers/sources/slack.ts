@@ -1,3 +1,5 @@
+import { telemetry } from '@/core/telemetry';
+
 import { dispatch, makeBus, subscribe } from '../bus';
 import type { Trigger } from '../core';
 import { hmacSha256Hex, SeenCache, timingSafeEqual } from '../shared';
@@ -176,35 +178,56 @@ class SlackReceiver {
 
     const event = payload.event;
     if (event) {
-      const context: SlackEventContext = {
+      const eventContext: SlackEventContext = {
         team_id: payload.team_id,
         api_app_id: payload.api_app_id,
         event_id: payload.event_id,
         event_time: payload.event_time,
       };
-      switch (event.type) {
-        case 'app_mention':
-          dispatch(this.appMentionBus, {
-            ...(event as unknown as SlackAppMention),
-            ...context,
-          });
-          break;
-        case 'message':
-          dispatch(this.messageBus, {
-            ...(event as unknown as SlackMessage),
-            ...context,
-          });
-          break;
-        case 'reaction_added':
-        case 'reaction_removed':
-          dispatch(this.reactionBus, {
-            ...(event as unknown as SlackReaction),
-            ...context,
-          });
-          break;
-        default:
-          break;
-      }
+      // Ingress span linked to any upstream trace context. Dispatch is
+      // fire-and-forget, so this marks receipt, not the agent turn it triggers.
+      void telemetry.withContext(
+        telemetry.extract(Object.fromEntries(req.headers)),
+        () =>
+          telemetry.span(
+            'trigger.receive',
+            {
+              kind: telemetry.SpanKind.SERVER,
+              attributes: {
+                'trigger.source': 'slack',
+                ...(payload.event_id
+                  ? { 'trigger.event.id': payload.event_id }
+                  : {}),
+              },
+            },
+
+            async () => {
+              switch (event.type) {
+                case 'app_mention':
+                  dispatch(this.appMentionBus, {
+                    ...(event as unknown as SlackAppMention),
+                    ...eventContext,
+                  });
+                  break;
+                case 'message':
+                  dispatch(this.messageBus, {
+                    ...(event as unknown as SlackMessage),
+                    ...eventContext,
+                  });
+                  break;
+                case 'reaction_added':
+                case 'reaction_removed':
+                  dispatch(this.reactionBus, {
+                    ...(event as unknown as SlackReaction),
+                    ...eventContext,
+                  });
+                  break;
+                default:
+                  break;
+              }
+            },
+          ),
+      );
     }
 
     if (eventId) this.events.add(eventId);
