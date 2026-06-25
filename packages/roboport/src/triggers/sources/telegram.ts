@@ -234,6 +234,7 @@ class TelegramReceiver {
             'trigger.source': 'telegram',
             'trigger.update.id': update.update_id,
           },
+          root: true,
           ...(upstream ? { links: [upstream] } : {}),
         },
         async () => {

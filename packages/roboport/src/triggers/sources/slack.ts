@@ -200,6 +200,7 @@ class SlackReceiver {
               ? { 'trigger.event.id': payload.event_id }
               : {}),
           },
+          root: true,
           ...(upstream ? { links: [upstream] } : {}),
         },
         async () => {

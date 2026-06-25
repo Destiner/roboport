@@ -9,6 +9,7 @@ import {
   type Counter,
   type Histogram,
   type Link,
+  ROOT_CONTEXT,
   type Span,
   SpanKind,
   SpanStatusCode,
@@ -105,6 +106,10 @@ interface SpanOptions {
   kind?: SpanKind;
   attributes?: Attributes;
   links?: Link[];
+  // Start the span against ROOT_CONTEXT instead of the ambient active context,
+  // making it a new trace root. Used for webhook ingress spans, which must not
+  // become children of an upstream/server trace — they link to it instead.
+  root?: boolean;
 }
 
 // Runs `fn` inside an active span: child spans created within (including across
@@ -116,26 +121,34 @@ async function span<T>(
   options: SpanOptions,
   fn: (span: Span) => Promise<T>,
 ): Promise<T> {
-  return tracer().startActiveSpan(
-    name,
-    {
-      kind: options.kind ?? SpanKind.INTERNAL,
-      attributes: options.attributes,
-      links: options.links,
-    },
-    async (active) => {
-      try {
-        return await fn(active);
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        active.recordException(err);
-        active.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
-        throw error;
-      } finally {
-        active.end();
-      }
-    },
-  );
+  function start(): Promise<T> {
+    return tracer().startActiveSpan(
+      name,
+      {
+        kind: options.kind ?? SpanKind.INTERNAL,
+        attributes: options.attributes,
+        links: options.links,
+      },
+      async (active) => {
+        try {
+          return await fn(active);
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          active.recordException(err);
+          active.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err.message,
+          });
+          throw error;
+        } finally {
+          active.end();
+        }
+      },
+    );
+  }
+  // `root` detaches from the ambient context so the span starts a new trace;
+  // `startActiveSpan` parents to whatever is active, so we make ROOT active.
+  return options.root ? context.with(ROOT_CONTEXT, start) : start();
 }
 
 // Starts a span as a child of the active context without making it active.
@@ -173,7 +186,10 @@ function failSpan(active: Span, error: unknown): void {
 function linkFromCarrier(
   carrier: Record<string, string | undefined>,
 ): Link | undefined {
-  const upstream = propagation.extract(context.active(), carrier);
+  // Extract from ROOT_CONTEXT, not the active context: otherwise, with no
+  // inbound `traceparent`, `getSpanContext` returns the ambient server span and
+  // we would link to our own caller instead of producing no link.
+  const upstream = propagation.extract(ROOT_CONTEXT, carrier);
   const spanContext = trace.getSpanContext(upstream);
   return spanContext ? { context: spanContext } : undefined;
 }

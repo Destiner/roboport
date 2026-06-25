@@ -391,13 +391,20 @@ async function runAgentLoopBody({
       throw err;
     }
 
-    modelSpan.setAttribute(telemetry.ATTR.responseFinishReasons, stopReason);
+    // `gen_ai.response.finish_reasons` is an array per the GenAI conventions.
+    modelSpan.setAttribute(telemetry.ATTR.responseFinishReasons, [stopReason]);
     modelSpan.setAttribute(telemetry.ATTR.usageInputTokens, usage.inputTokens);
     modelSpan.setAttribute(
       telemetry.ATTR.usageOutputTokens,
       usage.outputTokens,
     );
     if (telemetry.captureContent()) {
+      // `state.messages` is exactly the input for this request — the assistant
+      // reply is not appended until after the span ends below.
+      modelSpan.setAttribute(
+        telemetry.ATTR.promptContent,
+        JSON.stringify(state.messages),
+      );
       modelSpan.setAttribute(
         telemetry.ATTR.completionContent,
         assistantText(assistantContent),
