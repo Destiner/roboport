@@ -1,10 +1,12 @@
 # Telemetry
 
-Roboport is instrumented with [OpenTelemetry](https://opentelemetry.io). It emits traces and metrics against the global `@opentelemetry/api`, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). It never registers an SDK or exporter itself — you bring your own. With no SDK registered the API is a no-op, so there is nothing to configure and no overhead unless you opt in.
+Roboport is instrumented with [OpenTelemetry](https://opentelemetry.io). It emits traces and metrics against the global `@opentelemetry/api`, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/).
 
 ## Setup
 
-Register an SDK with an OTLP exporter pointed at your collector. The export URL lives on the exporter you configure — set it once, before importing your agent code.
+Register an SDK with an OTLP exporter pointed at your collector. The export URL lives on the exporter you configure.
+
+Set it once, before importing your agent code:
 
 ```ts
 import { NodeSDK } from '@opentelemetry/sdk-node';
@@ -27,14 +29,12 @@ new NodeSDK({
 const { Agent } = await import('roboport');
 ```
 
-Install the SDK packages yourself — they are not roboport dependencies:
+Install the SDK packages:
 
 ```bash
 bun add @opentelemetry/sdk-node @opentelemetry/exporter-trace-otlp-proto \
   @opentelemetry/exporter-metrics-otlp-proto @opentelemetry/sdk-metrics
 ```
-
-The `http/protobuf` exporter shown here is the OpenTelemetry default and the safest choice for an arbitrary collector. `@opentelemetry/exporter-*-otlp-http` (JSON) and `@opentelemetry/exporter-*-otlp-grpc` (gRPC) are drop-in alternatives.
 
 ## Spans
 
@@ -52,7 +52,7 @@ The `http/protobuf` exporter shown here is the OpenTelemetry default and the saf
 
 Spans nest along the awaited call chain: `channel.receive` → `agent.turn` → `chat.model` / `tool.execute` → `mcp.request`, given the AsyncLocalStorage-based context manager that `NodeSDK` registers by default.
 
-`trigger.receive` is an exception: trigger handlers run fire-and-forget so the webhook can return `200` immediately, so the agent turn it kicks off is a separate trace rather than a child. The receive span still links to upstream trace context (W3C `traceparent`) extracted from the request headers.
+`trigger.receive` is an exception: trigger handlers run fire-and-forget so the webhook can return `200` immediately, so the agent turn it kicks off is a separate trace rather than a child.
 
 ## Metrics
 
@@ -64,10 +64,8 @@ Spans nest along the awaited call chain: `channel.receive` → `agent.turn` → 
 
 ## Capturing prompt and tool content
 
-By default spans carry only metadata — token counts, model name, finish reason, tool name. To also attach prompt/completion text and tool arguments/results, set the conventional env var:
+By default spans carry only metadata: token counts, model name, finish reason, tool name. To also attach prompt/completion text and tool arguments/results, set the env var:
 
 ```bash
 OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
 ```
-
-Leave it off in environments where message content is sensitive.
