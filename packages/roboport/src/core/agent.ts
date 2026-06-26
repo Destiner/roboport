@@ -171,15 +171,41 @@ class Agent {
         ];
         registry = createRegistry(allTools);
         ctx = {
-          complete: async (p: string): Promise<string> => {
-            const response = await this.model.createMessage({
-              messages: [{ role: 'user', content: p }],
-            });
-            return response.content
-              .filter((block): block is TextPart => block.type === 'text')
-              .map((block) => block.text)
-              .join('\n');
-          },
+          complete: (p: string): Promise<string> =>
+            telemetry.span(
+              'chat.model',
+              {
+                attributes: {
+                  [telemetry.ATTR.operationName]: 'chat',
+                  ...(this.model.modelName
+                    ? { [telemetry.ATTR.requestModel]: this.model.modelName }
+                    : {}),
+                },
+              },
+              async (span): Promise<string> => {
+                const response = await this.model.createMessage({
+                  messages: [{ role: 'user', content: p }],
+                });
+                span.setAttribute(telemetry.ATTR.responseFinishReasons, [
+                  response.stopReason,
+                ]);
+                span.setAttribute(
+                  telemetry.ATTR.usageInputTokens,
+                  response.usage.inputTokens,
+                );
+                span.setAttribute(
+                  telemetry.ATTR.usageOutputTokens,
+                  response.usage.outputTokens,
+                );
+                const text = assistantText(response.content);
+                if (telemetry.captureContent()) {
+                  span.setAttribute(telemetry.ATTR.promptContent, p);
+                  span.setAttribute(telemetry.ATTR.completionContent, text);
+                }
+                telemetry.recordTokens(this.model.modelName, response.usage);
+                return text;
+              },
+            ),
           searchWeb: (query, opts): Promise<SearchHit[]> =>
             this.model.searchWeb(query, opts),
           session: state,
