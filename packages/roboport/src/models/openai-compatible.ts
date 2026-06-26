@@ -87,7 +87,7 @@ function parseToolArguments(raw: string): unknown {
 }
 
 abstract class OpenAICompatible extends Model {
-  override modelName: string;
+  modelName: string;
   apiKey: string;
   baseUrl: string;
   thinking: ThinkingLevel;

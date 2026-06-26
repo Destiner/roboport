@@ -177,8 +177,8 @@ class Agent {
               {
                 attributes: {
                   [telemetry.ATTR.operationName]: 'chat',
-                  ...(this.model.modelName
-                    ? { [telemetry.ATTR.requestModel]: this.model.modelName }
+                  ...(modelNameOf(this.model)
+                    ? { [telemetry.ATTR.requestModel]: modelNameOf(this.model) }
                     : {}),
                 },
               },
@@ -202,7 +202,7 @@ class Agent {
                   span.setAttribute(telemetry.ATTR.promptContent, p);
                   span.setAttribute(telemetry.ATTR.completionContent, text);
                 }
-                telemetry.recordTokens(this.model.modelName, response.usage);
+                telemetry.recordTokens(modelNameOf(this.model), response.usage);
                 return text;
               },
             ),
@@ -291,8 +291,9 @@ interface AgentLoopArgs {
 async function runAgentLoop(args: AgentLoopArgs): Promise<void> {
   const { model } = args;
   const turnStart = Date.now();
-  const modelAttrs = model.modelName
-    ? { [telemetry.ATTR.requestModel]: model.modelName }
+  const modelName = modelNameOf(model);
+  const modelAttrs = modelName
+    ? { [telemetry.ATTR.requestModel]: modelName }
     : {};
   await telemetry.span(
     'agent.turn',
@@ -323,6 +324,7 @@ async function runAgentLoopBody({
   emit,
   signal,
 }: AgentLoopArgs): Promise<void> {
+  const modelName = modelNameOf(model);
   while (true) {
     if (signal.aborted) break;
 
@@ -340,9 +342,7 @@ async function runAgentLoopBody({
     const modelSpan = telemetry.startSpan('chat.model', {
       attributes: {
         [telemetry.ATTR.operationName]: 'chat',
-        ...(model.modelName
-          ? { [telemetry.ATTR.requestModel]: model.modelName }
-          : {}),
+        ...(modelName ? { [telemetry.ATTR.requestModel]: modelName } : {}),
       },
     });
 
@@ -437,7 +437,7 @@ async function runAgentLoopBody({
       );
     }
     modelSpan.end();
-    telemetry.recordTokens(model.modelName, usage);
+    telemetry.recordTokens(modelName, usage);
 
     state.messages.push({ role: 'assistant', content: assistantContent });
     emit({ type: 'message-end', usage });
@@ -472,6 +472,14 @@ async function runAgentLoopBody({
 
     if (signal.aborted) break;
   }
+}
+
+// Read the adapter's model identifier structurally rather than off a base-class
+// member, so telemetry stays decoupled from the `Model` public surface and
+// custom adapters need not declare anything.
+function modelNameOf(model: Model): string | undefined {
+  const name = (model as { modelName?: unknown }).modelName;
+  return typeof name === 'string' ? name : undefined;
 }
 
 function assistantText(

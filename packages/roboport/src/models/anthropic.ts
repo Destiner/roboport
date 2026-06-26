@@ -208,7 +208,7 @@ function toWire(messages: Message[]): {
 }
 
 class Anthropic extends Model {
-  override modelName: string;
+  modelName: string;
   apiKey: string;
   thinking: ThinkingLevel;
 
