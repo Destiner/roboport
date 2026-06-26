@@ -1,5 +1,11 @@
 # roboport
 
+## 0.7.1
+
+### Patch Changes
+
+- [#71](https://github.com/Destiner/roboport/pull/71) [`e939e52`](https://github.com/Destiner/roboport/commit/e939e52ae688c10439ddec8f94d3934de5a0efdd) Thanks [@Destiner](https://github.com/Destiner)! - Add OpenTelemetry instrumentation. Emits GenAI-convention traces (`agent.turn`, `chat.model`, `tool.execute`, `mcp.connect`/`mcp.request`, `channel.receive`/`channel.send`, `trigger.receive`/`trigger.send`) and metrics (token counter, turn-duration histogram, tool-error counter) against the global `@opentelemetry/api`. Bring your own SDK and exporter; no-op when none is registered. Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` to attach prompt/completion and tool content to spans.
+
 ## 0.7.0
 
 ### Minor Changes
