@@ -40,6 +40,7 @@ function newMessages(session: Session, seedLength: number): Message[] {
 async function bufferReplies(
   turn: Turn,
   conversation: Conversation,
+  channelName?: string,
 ): Promise<void> {
   const blocks: string[] = [];
   let failure: Error | null = null;
@@ -51,7 +52,13 @@ async function bufferReplies(
   if (failure && !reply) throw failure;
   await telemetry.span(
     'channel.send',
-    { kind: telemetry.SpanKind.PRODUCER },
+    {
+      kind: telemetry.SpanKind.PRODUCER,
+      attributes: {
+        ...(channelName ? { 'channel.name': channelName } : {}),
+        'channel.conversation.id': conversation.conversationId,
+      },
+    },
     () => conversation.send(reply || '(no response)'),
   );
 }
@@ -79,7 +86,10 @@ function serve<In extends InboundMessage, Conv extends Conversation>(
   const keyOf =
     options.conversation ?? ((message: In): string => message.conversationId);
   const relay: Relay<In, Conv> =
-    options.relay ?? channel.relay ?? bufferReplies;
+    options.relay ??
+    channel.relay ??
+    ((turn, conversation): Promise<void> =>
+      bufferReplies(turn, conversation, channel.name));
   const queues = new Map<string, Promise<unknown>>();
 
   function runTurn(message: In, conversation: Conv, id: string): Promise<void> {
