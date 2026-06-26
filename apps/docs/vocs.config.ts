@@ -16,6 +16,7 @@ export default defineConfig({
         { text: 'MCP', link: '/concepts/mcp' },
         { text: 'Triggers', link: '/concepts/triggers' },
         { text: 'Channels', link: '/concepts/channels' },
+        { text: 'Telemetry', link: '/concepts/telemetry' },
       ],
     },
   ],

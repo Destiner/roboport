@@ -1,4 +1,5 @@
 import { Agent, Session, type Message, type TextPart, type Turn } from '@/core';
+import { telemetry } from '@/core/telemetry';
 
 import type { Channel, Conversation, InboundMessage, Relay } from './core';
 import { memoryStore, type ConversationStore } from './store';
@@ -39,6 +40,7 @@ function newMessages(session: Session, seedLength: number): Message[] {
 async function bufferReplies(
   turn: Turn,
   conversation: Conversation,
+  channelName?: string,
 ): Promise<void> {
   const blocks: string[] = [];
   let failure: Error | null = null;
@@ -48,7 +50,17 @@ async function bufferReplies(
   }
   const reply = blocks.join('\n\n').trim();
   if (failure && !reply) throw failure;
-  await conversation.send(reply || '(no response)');
+  await telemetry.span(
+    'channel.send',
+    {
+      kind: telemetry.SpanKind.PRODUCER,
+      attributes: {
+        ...(channelName ? { 'channel.name': channelName } : {}),
+        'channel.conversation.id': conversation.conversationId,
+      },
+    },
+    () => conversation.send(reply || '(no response)'),
+  );
 }
 
 // Keep the user-facing default generic — raw errors can carry provider response
@@ -74,10 +86,27 @@ function serve<In extends InboundMessage, Conv extends Conversation>(
   const keyOf =
     options.conversation ?? ((message: In): string => message.conversationId);
   const relay: Relay<In, Conv> =
-    options.relay ?? channel.relay ?? bufferReplies;
+    options.relay ??
+    channel.relay ??
+    ((turn, conversation): Promise<void> =>
+      bufferReplies(turn, conversation, channel.name));
   const queues = new Map<string, Promise<unknown>>();
 
-  async function runTurn(
+  function runTurn(message: In, conversation: Conv, id: string): Promise<void> {
+    return telemetry.span(
+      'channel.receive',
+      {
+        kind: telemetry.SpanKind.CONSUMER,
+        attributes: {
+          'channel.name': channel.name,
+          'channel.conversation.id': id,
+        },
+      },
+      () => runTurnInner(message, conversation, id),
+    );
+  }
+
+  async function runTurnInner(
     message: In,
     conversation: Conv,
     id: string,

@@ -47,10 +47,15 @@
     "build:manifest": "bun scripts/build-manifest.ts",
     "dist:pack": "bun run build && cd dist && bun pm pack --destination .."
   },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  },
   "peerDependencies": {
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@opentelemetry/context-async-hooks": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
     "tsc-alias": "^1.8.17",
     "zod": "^4.4.3"
   }

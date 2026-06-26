@@ -13,6 +13,7 @@ import type {
 import type { Model } from './model';
 import { Session, Turn, type SessionInternals, type TurnEmit } from './session';
 import { Skill } from './skill';
+import { telemetry } from './telemetry';
 import {
   Tool,
   createRegistry,
@@ -170,15 +171,41 @@ class Agent {
         ];
         registry = createRegistry(allTools);
         ctx = {
-          complete: async (p: string): Promise<string> => {
-            const response = await this.model.createMessage({
-              messages: [{ role: 'user', content: p }],
-            });
-            return response.content
-              .filter((block): block is TextPart => block.type === 'text')
-              .map((block) => block.text)
-              .join('\n');
-          },
+          complete: (p: string): Promise<string> =>
+            telemetry.span(
+              'chat.model',
+              {
+                attributes: {
+                  [telemetry.ATTR.operationName]: 'chat',
+                  ...(modelNameOf(this.model)
+                    ? { [telemetry.ATTR.requestModel]: modelNameOf(this.model) }
+                    : {}),
+                },
+              },
+              async (span): Promise<string> => {
+                const response = await this.model.createMessage({
+                  messages: [{ role: 'user', content: p }],
+                });
+                span.setAttribute(telemetry.ATTR.responseFinishReasons, [
+                  response.stopReason,
+                ]);
+                span.setAttribute(
+                  telemetry.ATTR.usageInputTokens,
+                  response.usage.inputTokens,
+                );
+                span.setAttribute(
+                  telemetry.ATTR.usageOutputTokens,
+                  response.usage.outputTokens,
+                );
+                const text = assistantText(response.content);
+                if (telemetry.captureContent()) {
+                  span.setAttribute(telemetry.ATTR.promptContent, p);
+                  span.setAttribute(telemetry.ATTR.completionContent, text);
+                }
+                telemetry.recordTokens(modelNameOf(this.model), response.usage);
+                return text;
+              },
+            ),
           searchWeb: (query, opts): Promise<SearchHit[]> =>
             this.model.searchWeb(query, opts),
           session: state,
@@ -261,7 +288,35 @@ interface AgentLoopArgs {
   signal: AbortSignal;
 }
 
-async function runAgentLoop({
+async function runAgentLoop(args: AgentLoopArgs): Promise<void> {
+  const { model } = args;
+  const turnStart = Date.now();
+  const modelName = modelNameOf(model);
+  const modelAttrs = modelName
+    ? { [telemetry.ATTR.requestModel]: modelName }
+    : {};
+  await telemetry.span(
+    'agent.turn',
+    {
+      attributes: {
+        [telemetry.ATTR.operationName]: 'invoke_agent',
+        ...modelAttrs,
+      },
+    },
+    async () => {
+      try {
+        await runAgentLoopBody(args);
+      } finally {
+        telemetry.recordTurnDuration(
+          (Date.now() - turnStart) / 1000,
+          modelAttrs,
+        );
+      }
+    },
+  );
+}
+
+async function runAgentLoopBody({
   model,
   state,
   registry,
@@ -269,6 +324,7 @@ async function runAgentLoop({
   emit,
   signal,
 }: AgentLoopArgs): Promise<void> {
+  const modelName = modelNameOf(model);
   while (true) {
     if (signal.aborted) break;
 
@@ -280,6 +336,15 @@ async function runAgentLoop({
     const assistantContent: (TextPart | ThinkingPart | ToolCallPart)[] = [];
     let stopReason: StopReason = 'end_turn';
     let usage = { inputTokens: 0, outputTokens: 0 };
+
+    // Manual span (not active): the model call has no child spans, and the
+    // abort `break` / error `throw` below must stay within the enclosing loop.
+    const modelSpan = telemetry.startSpan('chat.model', {
+      attributes: {
+        [telemetry.ATTR.operationName]: 'chat',
+        ...(modelName ? { [telemetry.ATTR.requestModel]: modelName } : {}),
+      },
+    });
 
     try {
       for await (const event of model.streamMessage({
@@ -341,13 +406,38 @@ async function runAgentLoop({
       }
     } catch (error) {
       if (signal.aborted) {
+        modelSpan.end();
         state.messages.push({ role: 'assistant', content: assistantContent });
         break;
       }
       const err = error instanceof Error ? error : new Error(String(error));
+      telemetry.failSpan(modelSpan, err);
+      modelSpan.end();
       emit({ type: 'error', error: err });
       throw err;
     }
+
+    // `gen_ai.response.finish_reasons` is an array per the GenAI conventions.
+    modelSpan.setAttribute(telemetry.ATTR.responseFinishReasons, [stopReason]);
+    modelSpan.setAttribute(telemetry.ATTR.usageInputTokens, usage.inputTokens);
+    modelSpan.setAttribute(
+      telemetry.ATTR.usageOutputTokens,
+      usage.outputTokens,
+    );
+    if (telemetry.captureContent()) {
+      // `state.messages` is exactly the input for this request — the assistant
+      // reply is not appended until after the span ends below.
+      modelSpan.setAttribute(
+        telemetry.ATTR.promptContent,
+        JSON.stringify(state.messages),
+      );
+      modelSpan.setAttribute(
+        telemetry.ATTR.completionContent,
+        assistantText(assistantContent),
+      );
+    }
+    modelSpan.end();
+    telemetry.recordTokens(modelName, usage);
 
     state.messages.push({ role: 'assistant', content: assistantContent });
     emit({ type: 'message-end', usage });
@@ -384,36 +474,82 @@ async function runAgentLoop({
   }
 }
 
+// Read the adapter's model identifier structurally rather than off a base-class
+// member, so telemetry stays decoupled from the `Model` public surface and
+// custom adapters need not declare anything.
+function modelNameOf(model: Model): string | undefined {
+  const name = (model as { modelName?: unknown }).modelName;
+  return typeof name === 'string' ? name : undefined;
+}
+
+function assistantText(
+  content: (TextPart | ThinkingPart | ToolCallPart)[],
+): string {
+  return content
+    .filter((block): block is TextPart => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n');
+}
+
 async function runTool(
   tool: Tool | undefined,
   call: ToolCallPart,
   ctx: ToolContext,
 ): Promise<ToolResultPart> {
-  if (!tool) {
-    return {
-      type: 'tool-result',
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      output: `Error: tool "${call.toolName}" not found`,
-    };
-  }
-  try {
-    const parsed = tool.parse(call.input);
-    const output = await tool.execute(parsed, ctx);
-    return {
-      type: 'tool-result',
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      output,
-    };
-  } catch (error) {
-    return {
-      type: 'tool-result',
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      output: `Error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
+  return telemetry.span(
+    'tool.execute',
+    {
+      attributes: {
+        [telemetry.ATTR.operationName]: 'execute_tool',
+        [telemetry.ATTR.toolName]: call.toolName,
+        [telemetry.ATTR.toolCallId]: call.toolCallId,
+        ...(telemetry.captureContent()
+          ? { [telemetry.ATTR.toolArguments]: JSON.stringify(call.input) }
+          : {}),
+      },
+    },
+    async (span): Promise<ToolResultPart> => {
+      if (!tool) {
+        telemetry.failSpan(
+          span,
+          new Error(`tool "${call.toolName}" not found`),
+        );
+        telemetry.recordToolError(call.toolName);
+        return {
+          type: 'tool-result',
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          output: `Error: tool "${call.toolName}" not found`,
+        };
+      }
+      try {
+        const parsed = tool.parse(call.input);
+        const output = await tool.execute(parsed, ctx);
+        if (telemetry.captureContent()) {
+          span.setAttribute(telemetry.ATTR.toolResult, String(output));
+        }
+        return {
+          type: 'tool-result',
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          output,
+        };
+      } catch (error) {
+        // The agent loop treats a tool error as data (a tool-result the model
+        // can recover from), not a thrown turn failure. Record it on the span
+        // and the error counter, but return the error string rather than
+        // rethrowing so the turn span stays unaffected.
+        telemetry.failSpan(span, error);
+        telemetry.recordToolError(call.toolName);
+        return {
+          type: 'tool-result',
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          output: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    },
+  );
 }
 
 // eslint-disable-next-line import-x/prefer-default-export

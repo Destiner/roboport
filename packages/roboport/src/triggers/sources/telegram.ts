@@ -1,3 +1,5 @@
+import { telemetry } from '@/core/telemetry';
+
 import { dispatch, makeBus, subscribe } from '../bus';
 import type { Trigger } from '../core';
 import { SeenCache, timingSafeEqual } from '../shared';
@@ -214,10 +216,27 @@ class TelegramReceiver {
       return new Response('duplicate', { status: 200 });
     }
 
-    if (update.message) {
-      dispatch(this.messageBus, update.message);
-    } else if (update.edited_message) {
-      dispatch(this.editedMessageBus, update.edited_message);
+    // Ingress span linked to any upstream trace the webhook carries. Dispatch
+    // is fire-and-forget (the HTTP response must not wait on agent work), so
+    // this span marks receipt rather than wrapping the agent turn, and stays a
+    // root of roboport's own trace — linked to, not parented by, the caller.
+    const inbound = update.message ?? update.edited_message;
+    if (inbound) {
+      const bus = update.message ? this.messageBus : this.editedMessageBus;
+      const upstream = telemetry.linkFromCarrier(
+        Object.fromEntries(req.headers),
+      );
+      telemetry.ingress(
+        'trigger.receive',
+        {
+          attributes: {
+            'trigger.source': 'telegram',
+            'trigger.update.id': update.update_id,
+          },
+          ...(upstream ? { links: [upstream] } : {}),
+        },
+        () => dispatch(bus, inbound),
+      );
     }
 
     this.updates.add(update.update_id);
@@ -265,24 +284,36 @@ class TelegramClient {
     this.baseUrl = (opts?.baseUrl ?? TELEGRAM_API_BASE).replace(/\/+$/, '');
   }
 
-  private async call<T>(
+  private call<T>(
     method: string,
     params: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/bot${this.token}/${method}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(params),
-      ...(signal ? { signal } : {}),
-    });
-    const data = (await response.json()) as TelegramApiResponse<T>;
-    if (!data.ok) {
-      throw new Error(
-        `Telegram ${method} failed (${response.status}): ${data.description ?? 'unknown error'}`,
-      );
-    }
-    return data.result as T;
+    return telemetry.span(
+      'trigger.send',
+      {
+        kind: telemetry.SpanKind.CLIENT,
+        attributes: { 'trigger.source': 'telegram', 'rpc.method': method },
+      },
+      async (): Promise<T> => {
+        const response = await fetch(
+          `${this.baseUrl}/bot${this.token}/${method}`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(params),
+            ...(signal ? { signal } : {}),
+          },
+        );
+        const data = (await response.json()) as TelegramApiResponse<T>;
+        if (!data.ok) {
+          throw new Error(
+            `Telegram ${method} failed (${response.status}): ${data.description ?? 'unknown error'}`,
+          );
+        }
+        return data.result as T;
+      },
+    );
   }
 
   getMe(): Promise<TelegramUser> {

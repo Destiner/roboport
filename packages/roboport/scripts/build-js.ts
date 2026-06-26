@@ -14,6 +14,8 @@ const proc = Bun.spawn(
     'node',
     '--external',
     'zod',
+    '--external',
+    '@opentelemetry/api',
     '--root',
     './src',
   ],
