@@ -32,7 +32,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
   - `src/skills/` - Opt-in skill bundle; each skill is a `<name>/SKILL.md` with YAML frontmatter (`name`, `description`); `src/skills/index.ts` imports the raw text and parses each into a `Skill` instance
   - `src/triggers/` - Trigger primitives, webhook receivers, and provider clients
   - `examples/` - Standalone usage examples
-- `apps/bot/` - Webhook-driven runner. Hono server mounts `GithubReceiver` at `POST /webhooks/github`, dispatches `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows for actionable PR and review-comment events, and opens advisory GitHub check runs for PR workflows. Deployed to Railway via `apps/bot/Dockerfile`; codex auth/refresh tokens persist on a mounted volume. `src/otel.ts` must be imported before `roboport` so the bot's NodeSDK can register OTLP trace/metric exporters from `OTEL_EXPORTER_OTLP_*` env vars.
+- `apps/bot/` - Webhook-driven runner. Hono server mounts `GithubReceiver` at `POST /webhooks/github`, dispatches `pr-review`, `docs-update`, `simplify`, and `dx-audit` workflows for actionable PR and review-comment events, and opens advisory GitHub check runs for PR workflows. Deployed to Railway via `apps/bot/Dockerfile`; codex auth/refresh tokens persist on a mounted volume. `src/otel.ts` must be imported before `roboport`; it starts the bot's NodeSDK only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, then registers OTLP trace/metric exporters from `OTEL_EXPORTER_OTLP_*` env vars.
 - `apps/docs/` - Vocs docs site (`name: "@roboport/docs"`).
 
 ## Patterns
