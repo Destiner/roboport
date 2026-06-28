@@ -44,6 +44,11 @@ Optional:
 - `ROBOPORT_GIT_USER_NAME`, `ROBOPORT_GIT_USER_EMAIL` — override the commit author; default to the app's bot identity so commits link to the app
 - `PORT` (default `3000`)
 - `ROBOPORT_OPENAI_CODEX_AUTH_FILE` (default `/data/openai-codex-auth.json`) — codex auth/refresh-token store
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP collector base URL (e.g. the Grafana Cloud OTLP gateway). Unset means no telemetry SDK starts and the bot exports nothing; setting it turns on trace/metric export
+- `OTEL_EXPORTER_OTLP_HEADERS` — exporter headers, e.g. `Authorization=Basic%20<base64>` for Grafana Cloud auth (values are percent-decoded — keep the `%20`)
+- `OTEL_EXPORTER_OTLP_PROTOCOL` — OTLP transport (`http/protobuf`)
+- `OTEL_SERVICE_NAME` (default `roboport-bot`) — service name attached to exported telemetry
+- `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` — set `true` to attach prompt/completion and tool arg/result content to spans (off by default)
 
 ## Deployment (Railway)
 
