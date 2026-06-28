@@ -12,8 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "roboport": "workspace:*",
+    "@opentelemetry/exporter-metrics-otlp-proto": "^0.219.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "@opentelemetry/sdk-metrics": "^2.8.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
     "hono": "^4.0.0",
+    "roboport": "workspace:*",
     "zod": "^4.4.3"
   }
 }

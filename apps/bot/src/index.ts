@@ -1,3 +1,7 @@
+// Side-effect import: must run before roboport is imported so the OTel SDK
+// registers its global providers before any span is emitted.
+import './otel';
+
 import { Hono } from 'hono';
 import {
   github,
