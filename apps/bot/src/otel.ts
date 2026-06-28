@@ -1,6 +1,3 @@
-// OpenTelemetry SDK bootstrap. Imported first in index.ts so the global
-// tracer/meter providers are registered before roboport emits any spans.
-//
 // Exporters read OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS
 // from the environment (set as Railway secrets). With those unset the SDK
 // still starts but exports nowhere, so local runs stay quiet.
