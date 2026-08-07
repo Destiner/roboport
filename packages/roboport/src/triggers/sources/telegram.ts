@@ -30,6 +30,15 @@ interface TextQuote {
   is_manual?: boolean;
 }
 
+// A rich message as received. Telegram sends no flat rendering: the content is
+// a tree of blocks whose `text` is a run of plain strings and nested nodes, so
+// `Message.text` is absent entirely on these. Only the shape we walk is modelled
+// — block and inline types vary (paragraph, heading, list, table, code, …) and
+// are left open rather than enumerated.
+interface RichMessageContent {
+  blocks?: unknown[];
+}
+
 interface TelegramMessage {
   message_id: number;
   message_thread_id?: number;
@@ -38,6 +47,8 @@ interface TelegramMessage {
   date: number;
   text?: string;
   caption?: string;
+  // Present instead of `text` when the message was sent with sendRichMessage.
+  rich_message?: RichMessageContent;
   // The replied-to message, delivered inline with the update. Telegram does not
   // nest further: this object never carries its own reply_to_message.
   reply_to_message?: TelegramMessage;
@@ -108,6 +119,44 @@ const TELEGRAM_API_BASE = 'https://api.telegram.org';
 const MAX_MESSAGE_LENGTH = 4096;
 // Rich messages allow far more: up to 32768 UTF-8 characters.
 const MAX_RICH_MESSAGE_LENGTH = 32768;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// Inline runs concatenate: ['a ', {type:'bold', text:'b'}] renders "a b".
+function inlineText(node: unknown): string {
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node)) return node.map(inlineText).join('');
+  if (isRecord(node)) return inlineText(node.text);
+  return '';
+}
+
+// Block containers stack, one line each. Container keys beyond `text` are
+// best-effort: an absent key contributes nothing, so an unfamiliar block type
+// degrades to less text rather than to a wrong reading.
+function blockText(node: unknown): string {
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node))
+    return node.map(blockText).filter(Boolean).join('\n');
+  if (isRecord(node)) {
+    if ('text' in node) return inlineText(node.text);
+    for (const key of ['blocks', 'items', 'rows', 'cells', 'caption']) {
+      if (key in node) return blockText(node[key]);
+    }
+  }
+  return '';
+}
+
+// Recover a plain-text rendering of a rich message. Telegram ships no flat
+// version — `Message.text` is absent on these — so anything that needs the words
+// (quoting a reply, logging, search) has to walk the block tree itself.
+function richMessageText(
+  rich: RichMessageContent | undefined,
+): string | undefined {
+  const text = blockText(rich?.blocks).trim();
+  return text.length > 0 ? text : undefined;
+}
 
 // Validate a rich message and build its `rich_message` payload, enforcing the
 // API's "exactly one of markdown/html" rule and the rich length limit.
@@ -524,12 +573,14 @@ function telegram(options: TelegramReceiverOptions): TelegramReceiver {
 
 export {
   matchesCommand,
+  richMessageText,
   telegram,
   TelegramClient,
   TelegramReceiver,
   splitMessage,
   MAX_RICH_MESSAGE_LENGTH,
   type RichMessage,
+  type RichMessageContent,
   type SendMessageDraftOptions,
   type SendMessageOptions,
   type SendRichMessageDraftOptions,

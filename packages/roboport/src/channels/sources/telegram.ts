@@ -2,6 +2,7 @@ import type { MaybePromise, Unsub } from '@/triggers/core';
 import {
   matchesCommand,
   MAX_RICH_MESSAGE_LENGTH,
+  richMessageText,
   TelegramClient,
   TelegramReceiver,
   type SendRichMessageOptions,
@@ -72,7 +73,9 @@ function toReplyContext(message: TelegramMessage): ReplyContext | undefined {
   if (!parent) return undefined;
   return {
     id: String(parent.message_id),
-    text: parent.text ?? parent.caption,
+    // The agent's own replies go out as rich messages, which carry no `text` —
+    // the common case here is a user replying to one of those.
+    text: parent.text ?? parent.caption ?? richMessageText(parent.rich_message),
     user: parent.from
       ? {
           id: String(parent.from.id),
