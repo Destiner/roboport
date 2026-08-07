@@ -4,6 +4,7 @@ import {
   type Conversation,
   type InboundMessage,
   type Relay,
+  type ReplyContext,
 } from './core';
 import { serve, type ChannelRuntime, type ServeOptions } from './serve';
 import {
@@ -12,6 +13,7 @@ import {
   type TelegramChannel,
   type TelegramChannelOptions,
   type TelegramConversation,
+  type TelegramInboundMessage,
   type TelegramTransport,
 } from './sources/telegram';
 import { fileStore, memoryStore, type ConversationStore } from './store';
@@ -29,9 +31,11 @@ export {
   type ConversationStore,
   type InboundMessage,
   type Relay,
+  type ReplyContext,
   type ServeOptions,
   type TelegramChannel,
   type TelegramChannelOptions,
   type TelegramConversation,
+  type TelegramInboundMessage,
   type TelegramTransport,
 };

@@ -44,6 +44,48 @@ await channel.client.setWebhook(`${publicUrl}${route}`, {
 });
 ```
 
+## Inbound messages
+
+Each inbound message is provider-agnostic data:
+
+```ts
+interface InboundMessage {
+  id: string; // transport message id, for replies and dedup
+  conversationId: string; // stable session key (e.g. chat id)
+  text: string;
+  user?: { id: string; name?: string };
+  replyTo?: ReplyContext;
+  raw?: unknown; // narrowed by the channel (Telegram: `TelegramMessage`)
+}
+```
+
+When the user replies to an earlier message, `replyTo` carries that message, not just a pointer to it — Telegram ships the parent inline with the update, so there is nothing to look up:
+
+```ts
+interface ReplyContext {
+  id: string;
+  text?: string;
+  user?: { id: string; name?: string };
+  isBot?: boolean; // the agent's own message, rather than a human's
+  quote?: string; // the fragment the sender highlighted, if they picked one
+}
+```
+
+By default `serve` prompts the agent with `message.text` alone, so a reply reaches the model with no idea what it points at. Use the `prompt` seam to fold the context in:
+
+```ts
+serve(agent, channel, {
+  prompt: (message) => {
+    const quoted = message.replyTo?.quote ?? message.replyTo?.text;
+    if (!quoted) return message.text;
+    const from = message.replyTo?.isBot ? 'assistant' : 'user';
+    return `<replying-to from="${from}">\n${quoted}\n</replying-to>\n\n${message.text}`;
+  },
+});
+```
+
+Whatever `prompt` returns is what gets persisted to the conversation store, so the transcript records what the model actually saw.
+
 ## Custom channel
 
 A channel implements the `Channel` interface: `open(handler)` wires the transport and returns an unsubscribe (mirroring a trigger's `start`), `handle?(req)` is present for webhook transports the host mounts in an HTTP server, and `relay?` sets the default reply strategy. Each inbound message arrives with a `Conversation` carrying `send(text)` and an optional `thinking()` presence indicator. `telegramChannel` is the reference implementation.

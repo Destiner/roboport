@@ -1,6 +1,19 @@
 import type { Turn } from '@/core';
 import type { MaybePromise, Unsub } from '@/triggers/core';
 
+// The message an inbound message replies to, when the transport delivers it
+// inline (Telegram ships the whole parent with the update, so no lookup is
+// needed). `isBot` separates "replying to the agent" from "quoting a human";
+// `quote` is the fragment the sender highlighted, when they picked one rather
+// than replying to the message as a whole.
+interface ReplyContext {
+  id: string;
+  text?: string;
+  user?: { id: string; name?: string };
+  isBot?: boolean;
+  quote?: string;
+}
+
 // A provider-agnostic inbound message. Plain data — the live capabilities
 // (replying, presence) live on the Conversation, not here. `id` is the transport
 // message id (e.g. Telegram message_id), used for replies/drafts/dedup;
@@ -10,7 +23,7 @@ interface InboundMessage {
   conversationId: string;
   text: string;
   user?: { id: string; name?: string };
-  replyToId?: string;
+  replyTo?: ReplyContext;
   raw?: unknown;
 }
 
@@ -55,4 +68,11 @@ interface Channel<
   relay?: Relay<In, Conv>;
 }
 
-export type { Channel, ChannelHandler, Conversation, InboundMessage, Relay };
+export type {
+  Channel,
+  ChannelHandler,
+  Conversation,
+  InboundMessage,
+  Relay,
+  ReplyContext,
+};
