@@ -1,5 +1,11 @@
 # roboport
 
+## 0.8.1
+
+### Patch Changes
+
+- [#77](https://github.com/Destiner/roboport/pull/77) [`4573baf`](https://github.com/Destiner/roboport/commit/4573baf5930616530a8868437818d70f53531cd5) Thanks [@Destiner](https://github.com/Destiner)! - Recover the text of a replied-to rich message. A message sent with `sendRichMessage` carries no `text` — its content is a block tree under `rich_message` — so `replyTo.text` was empty whenever a user replied to one of the agent's own replies, which is the common case. `TelegramMessage` now models `rich_message`, and the new `richMessageText` helper (exported from `roboport/triggers`) flattens the block tree into plain text.
+
 ## 0.8.0
 
 ### Minor Changes
