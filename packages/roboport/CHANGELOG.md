@@ -1,5 +1,11 @@
 # roboport
 
+## 0.8.0
+
+### Minor Changes
+
+- [#75](https://github.com/Destiner/roboport/pull/75) [`9d33ca2`](https://github.com/Destiner/roboport/commit/9d33ca28600c76163433905c7dd2408383775dd2) Thanks [@Destiner](https://github.com/Destiner)! - Carry the replied-to message through to inbound channel messages. `InboundMessage.replyToId` is replaced by `replyTo`, a `ReplyContext` with the parent message's `id`, `text`, `user`, whether it was the agent's own message (`isBot`), and the fragment the sender highlighted (`quote`) — Telegram delivers the parent inline, so nothing is looked up. The Telegram channel now types its inbound messages as `TelegramInboundMessage`, narrowing `raw` to `TelegramMessage` across serve's seams. `serve`'s default prompt is still `message.text`; use the `prompt` seam to fold the reply into what the agent sees.
+
 ## 0.7.1
 
 ### Patch Changes
