@@ -14,7 +14,14 @@ import type {
   Conversation,
   InboundMessage,
   Relay,
+  ReplyContext,
 } from '../core';
+
+// Narrows `raw` to the Telegram message, so serve's seams (prompt, authorize,
+// context, relay, onError) see the transport payload without casting.
+interface TelegramInboundMessage extends InboundMessage {
+  raw: TelegramMessage;
+}
 
 interface TelegramConversation extends Conversation {
   chatId: number;
@@ -38,7 +45,7 @@ interface TelegramChannelOptions {
 }
 
 interface TelegramChannel extends Channel<
-  InboundMessage,
+  TelegramInboundMessage,
   TelegramConversation
 > {
   client: TelegramClient;
@@ -58,7 +65,26 @@ function conversationKey(message: TelegramMessage): string {
     : String(message.chat.id);
 }
 
-function toInbound(message: TelegramMessage): InboundMessage {
+// Telegram delivers the replied-to message inline, so the parent's text and
+// author come free with the update — no id lookup against past history.
+function toReplyContext(message: TelegramMessage): ReplyContext | undefined {
+  const parent = message.reply_to_message;
+  if (!parent) return undefined;
+  return {
+    id: String(parent.message_id),
+    text: parent.text ?? parent.caption,
+    user: parent.from
+      ? {
+          id: String(parent.from.id),
+          name: parent.from.username ?? parent.from.first_name,
+        }
+      : undefined,
+    isBot: parent.from?.is_bot,
+    quote: message.quote?.text,
+  };
+}
+
+function toInbound(message: TelegramMessage): TelegramInboundMessage {
   return {
     id: String(message.message_id),
     conversationId: conversationKey(message),
@@ -69,9 +95,7 @@ function toInbound(message: TelegramMessage): InboundMessage {
           name: message.from.username ?? message.from.first_name,
         }
       : undefined,
-    replyToId: message.reply_to_message
-      ? String(message.reply_to_message.message_id)
-      : undefined,
+    replyTo: toReplyContext(message),
     raw: message,
   };
 }
@@ -137,7 +161,7 @@ function telegramChannel(options: TelegramChannelOptions): TelegramChannel {
   }
 
   function deliver(
-    handler: ChannelHandler<InboundMessage, TelegramConversation>,
+    handler: ChannelHandler<TelegramInboundMessage, TelegramConversation>,
     message: TelegramMessage,
   ): void {
     void Promise.resolve(
@@ -156,7 +180,7 @@ function telegramChannel(options: TelegramChannelOptions): TelegramChannel {
       client,
       handle: receiver.handle,
       open(
-        handler: ChannelHandler<InboundMessage, TelegramConversation>,
+        handler: ChannelHandler<TelegramInboundMessage, TelegramConversation>,
       ): MaybePromise<Unsub> {
         const trigger = receiver.message(
           options.commands
@@ -172,7 +196,7 @@ function telegramChannel(options: TelegramChannelOptions): TelegramChannel {
     name: 'telegram',
     client,
     open(
-      handler: ChannelHandler<InboundMessage, TelegramConversation>,
+      handler: ChannelHandler<TelegramInboundMessage, TelegramConversation>,
     ): MaybePromise<Unsub> {
       const controller = new AbortController();
       void (async (): Promise<void> => {
@@ -210,7 +234,7 @@ function telegramChannel(options: TelegramChannelOptions): TelegramChannel {
 // tokens arrive (throttled), then commit the final reply with sendRichMessage.
 function stream(
   options: { throttleMs?: number } = {},
-): Relay<InboundMessage, TelegramConversation> {
+): Relay<TelegramInboundMessage, TelegramConversation> {
   const throttleMs = options.throttleMs ?? DRAFT_THROTTLE_MS;
   return async (turn, conversation): Promise<void> => {
     const blocks: string[] = [];
@@ -266,5 +290,6 @@ export {
   type TelegramChannel,
   type TelegramChannelOptions,
   type TelegramConversation,
+  type TelegramInboundMessage,
   type TelegramTransport,
 };

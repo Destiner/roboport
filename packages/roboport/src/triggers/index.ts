@@ -57,6 +57,7 @@ import {
   type TelegramReceiverOptions,
   type TelegramUpdate,
   type TelegramUser,
+  type TextQuote,
 } from './sources/telegram';
 import {
   webhook,
@@ -114,6 +115,7 @@ export {
   type TelegramReceiverOptions,
   type TelegramUpdate,
   type TelegramUser,
+  type TextQuote,
   type Trigger,
   type TriggerHandler,
   type Unsub,

@@ -3,8 +3,8 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import {
   stream,
   telegramChannel,
-  type InboundMessage,
   type TelegramConversation,
+  type TelegramInboundMessage,
 } from '@/channels';
 import type { Turn } from '@/core';
 import {
@@ -48,7 +48,7 @@ describe('telegramChannel (webhook)', () => {
       token: 't',
       transport: { mode: 'webhook', secretToken: SECRET },
     });
-    const received: InboundMessage[] = [];
+    const received: TelegramInboundMessage[] = [];
     await channel.open((message) => {
       received.push(message);
     });
@@ -64,6 +64,72 @@ describe('telegramChannel (webhook)', () => {
       text: 'hello',
       user: { id: '42', name: 'Tim' },
     });
+    expect(received[0]?.replyTo).toBeUndefined();
+  });
+
+  test('carries the replied-to message inline', async () => {
+    const channel = telegramChannel({
+      token: 't',
+      transport: { mode: 'webhook', secretToken: SECRET },
+    });
+    const received: TelegramInboundMessage[] = [];
+    await channel.open((message) => {
+      received.push(message);
+    });
+
+    await channel.handle!(
+      makeRequest({
+        update_id: 1,
+        message: privateMessage({
+          message_id: 7,
+          text: 'are you sure?',
+          reply_to_message: privateMessage({
+            message_id: 6,
+            from: { id: 9, is_bot: true, first_name: 'Bot' },
+            text: 'The rate limit resets hourly.',
+          }),
+        }),
+      }),
+    );
+
+    expect(received[0]?.replyTo).toEqual({
+      id: '6',
+      text: 'The rate limit resets hourly.',
+      user: { id: '9', name: 'Bot' },
+      isBot: true,
+      quote: undefined,
+    });
+  });
+
+  test('prefers the highlighted fragment when the sender quoted one', async () => {
+    const channel = telegramChannel({
+      token: 't',
+      transport: { mode: 'webhook', secretToken: SECRET },
+    });
+    const received: TelegramInboundMessage[] = [];
+    await channel.open((message) => {
+      received.push(message);
+    });
+
+    await channel.handle!(
+      makeRequest({
+        update_id: 1,
+        message: privateMessage({
+          message_id: 7,
+          text: 'this part',
+          reply_to_message: privateMessage({
+            message_id: 6,
+            text: 'a long message with a notable clause in it',
+          }),
+          quote: { text: 'a notable clause', position: 21, is_manual: true },
+        }),
+      }),
+    );
+
+    expect(received[0]?.replyTo?.quote).toBe('a notable clause');
+    expect(received[0]?.replyTo?.text).toBe(
+      'a long message with a notable clause in it',
+    );
   });
 });
 
@@ -158,7 +224,12 @@ describe('TelegramConversation', () => {
 });
 
 describe('stream relay', () => {
-  const message: InboundMessage = { id: '1', conversationId: '1', text: '' };
+  const message: TelegramInboundMessage = {
+    id: '1',
+    conversationId: '1',
+    text: '',
+    raw: privateMessage(),
+  };
 
   function captureConversation(): {
     conversation: TelegramConversation;

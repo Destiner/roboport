@@ -22,6 +22,14 @@ interface TelegramChat {
   last_name?: string;
 }
 
+// The fragment the sender highlighted before replying, when they quoted part of
+// the original rather than all of it. Entities are not modelled.
+interface TextQuote {
+  text: string;
+  position: number;
+  is_manual?: boolean;
+}
+
 interface TelegramMessage {
   message_id: number;
   message_thread_id?: number;
@@ -30,7 +38,10 @@ interface TelegramMessage {
   date: number;
   text?: string;
   caption?: string;
+  // The replied-to message, delivered inline with the update. Telegram does not
+  // nest further: this object never carries its own reply_to_message.
   reply_to_message?: TelegramMessage;
+  quote?: TextQuote;
 }
 
 interface TelegramUpdate {
@@ -529,4 +540,5 @@ export {
   type TelegramReceiverOptions,
   type TelegramUpdate,
   type TelegramUser,
+  type TextQuote,
 };
