@@ -71,6 +71,8 @@ interface ReplyContext {
 }
 ```
 
+`text` is filled in even when the parent was a rich message. Those carry no `text` of their own — the content is a block tree — so it is flattened back to plain text, which matters because replying to one of the agent's own replies is the common case.
+
 By default `serve` prompts the agent with `message.text` alone, so a reply reaches the model with no idea what it points at. Use the `prompt` seam to fold the context in:
 
 ```ts

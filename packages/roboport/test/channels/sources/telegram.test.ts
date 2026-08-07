@@ -101,6 +101,50 @@ describe('telegramChannel (webhook)', () => {
     });
   });
 
+  test('recovers text when replying to a rich message', async () => {
+    const channel = telegramChannel({
+      token: 't',
+      transport: { mode: 'webhook', secretToken: SECRET },
+    });
+    const received: TelegramInboundMessage[] = [];
+    await channel.open((message) => {
+      received.push(message);
+    });
+
+    // Shape as Telegram actually returns it: no `text`, content in a block tree.
+    const richParent: TelegramMessage = {
+      message_id: 6,
+      from: { id: 9, is_bot: true, first_name: 'Bot' },
+      chat: { id: 42, type: 'private' },
+      date: 0,
+      rich_message: {
+        blocks: [
+          {
+            type: 'paragraph',
+            text: ['probe: ', { type: 'bold', text: 'bold' }, ' and done'],
+          },
+          { type: 'paragraph', text: ['second line'] },
+        ],
+      },
+    };
+
+    await channel.handle!(
+      makeRequest({
+        update_id: 1,
+        message: privateMessage({
+          message_id: 7,
+          text: 'are you sure?',
+          reply_to_message: richParent,
+        }),
+      }),
+    );
+
+    expect(received[0]?.replyTo?.text).toBe(
+      'probe: bold and done\nsecond line',
+    );
+    expect(received[0]?.replyTo?.isBot).toBe(true);
+  });
+
   test('prefers the highlighted fragment when the sender quoted one', async () => {
     const channel = telegramChannel({
       token: 't',
