@@ -3,3 +3,4 @@ node_modules/
 .vocs/
 dist/
 pages.gen.ts
+*.tgz
