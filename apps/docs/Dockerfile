@@ -4,7 +4,6 @@ FROM oven/bun:1-alpine
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml tsconfig.json ./
-COPY apps/bot/package.json ./apps/bot/
 COPY apps/docs/package.json ./apps/docs/
 COPY packages/roboport/package.json ./packages/roboport/
 
