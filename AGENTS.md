@@ -25,7 +25,7 @@ Bun workspaces monorepo. `packages/*` hold libraries; `apps/*` hold runnable ser
 
 - `packages/roboport/` - the framework package (`name: "roboport"`); workspace consumers import `src` directly, `bun --filter roboport dist:pack` builds and tarballs `dist/` with its own manifest (the standard `bun pm pack` from this directory packs `src` and is not the supported flow); subpath exports for `channels`, `harness`, `mcp`, `models`, `skills`, `triggers`
   - `src/core/` - Agent loop and `Tool` / `Skill` / `Agent` / `Session` primitives, plus provider-agnostic message and stream event types; `telemetry.ts` is the internal OpenTelemetry wrapper (span/metric helpers over the global `@opentelemetry/api`)
-  - `src/models/` - `Model` adapters; OpenAI Codex auth lives in `openai-codex-auth.ts`
+  - `src/models/` - `Model` adapters; OpenAI Codex auth lives in `openai-codex-auth.ts`, and `openrouter.ts` reaches the whole OpenRouter catalogue behind one key
   - `src/mcp/` - MCP client; transports in `core.ts`, auth in `auth.ts` / `oauth.ts`, server presets in `clients/`
   - `src/channels/` - Channel primitive and `serve` runtime for bidirectional chat transports; includes Telegram polling/webhook support and memory/file conversation stores
   - `src/harness/` - `Harness` bundle, presets, and reusable tools in `tools.ts` (file and shell tools delegate to the `shared.ts` helpers)
