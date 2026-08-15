@@ -66,7 +66,11 @@ const read = new Tool({
   description:
     'Reads a file from the local filesystem. Supports text, images, PDFs, and Jupyter notebooks. Returns content with line numbers in cat -n format.',
   inputSchema: z.object({
-    file_path: z.string().describe('The absolute path to the file to read.'),
+    file_path: z
+      .string()
+      .describe(
+        'Path to the file to read. A relative path resolves against the working directory.',
+      ),
     offset: z
       .number()
       .int()
@@ -90,8 +94,8 @@ const read = new Tool({
         'Page range for PDF files (e.g., "1-5"). Only applicable to PDF files. Max 20 pages per request.',
       ),
   }),
-  execute: ({ file_path, offset, limit }): Promise<string> =>
-    readFile(file_path, { offset, limit }),
+  execute: ({ file_path, offset, limit }, ctx: ToolContext): Promise<string> =>
+    readFile(resolve(ctx.cwd, file_path), { offset, limit }),
 });
 
 const edit = new Tool({
@@ -99,7 +103,11 @@ const edit = new Tool({
   description:
     'Performs exact string replacements in files. Must read the file at least once in the conversation before editing.',
   inputSchema: z.object({
-    file_path: z.string().describe('The absolute path to the file to modify.'),
+    file_path: z
+      .string()
+      .describe(
+        'Path to the file to modify. A relative path resolves against the working directory.',
+      ),
     old_string: z.string().describe('The text to replace.'),
     new_string: z
       .string()
@@ -109,22 +117,21 @@ const edit = new Tool({
       .optional()
       .describe('Replace all occurrences of old_string (default false).'),
   }),
-  execute: async ({
-    file_path,
-    old_string,
-    new_string,
-    replace_all,
-  }): Promise<string> => {
+  execute: async (
+    { file_path, old_string, new_string, replace_all },
+    ctx: ToolContext,
+  ): Promise<string> => {
+    const path = resolve(ctx.cwd, file_path);
     if (replace_all) {
-      const content = await fsReadFile(file_path, 'utf8');
+      const content = await fsReadFile(path, 'utf8');
       const updated = content.split(old_string).join(new_string);
-      await writeFile(file_path, updated);
-      return `Edited ${file_path} (replace_all).`;
+      await writeFile(path, updated);
+      return `Edited ${path} (replace_all).`;
     }
-    await applyExactReplacements(file_path, [
+    await applyExactReplacements(path, [
       { oldString: old_string, newString: new_string },
     ]);
-    return `Edited ${file_path}.`;
+    return `Edited ${path}.`;
   },
 });
 
@@ -135,13 +142,19 @@ const write = new Tool({
   inputSchema: z.object({
     file_path: z
       .string()
-      .describe('The absolute path to the file to write (must be absolute).'),
+      .describe(
+        'Path to the file to write. A relative path resolves against the working directory.',
+      ),
     content: z.string().describe('The content to write to the file.'),
   }),
-  execute: async ({ file_path, content }): Promise<string> => {
-    await mkdir(dirname(file_path), { recursive: true });
-    await writeFile(file_path, content);
-    return `Wrote ${file_path}.`;
+  execute: async (
+    { file_path, content },
+    ctx: ToolContext,
+  ): Promise<string> => {
+    const path = resolve(ctx.cwd, file_path);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, content);
+    return `Wrote ${path}.`;
   },
 });
 
