@@ -1,5 +1,11 @@
 # roboport
 
+## 0.9.1
+
+### Patch Changes
+
+- [#81](https://github.com/Destiner/roboport/pull/81) [`e2616b2`](https://github.com/Destiner/roboport/commit/e2616b2767dc7e78aa44ee4b868edef1716fa9e1) Thanks [@Destiner](https://github.com/Destiner)! - Resolve `claudeCode` file-tool paths against the session `cwd`. `Read`, `Edit`, and `Write` passed `file_path` straight to the filesystem, so a relative path resolved against `process.cwd()` and escaped the directory the session was scoped to — the `pi` harness already resolved against `ctx.cwd`. Their schemas demanded absolute paths, which masked the bug with models that reliably send them; models that send `./note.txt` wrote to the wrong directory. Absolute paths are unaffected.
+
 ## 0.9.0
 
 ### Minor Changes
