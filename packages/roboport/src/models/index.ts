@@ -3,6 +3,7 @@ import { GEMINI_MODELS, Gemini } from './google';
 import { MOONSHOT_MODELS, Moonshot } from './moonshot';
 import { OPENAI_MODELS, OpenAI } from './openai';
 import { OpenAICompatible } from './openai-compatible';
+import { OPENROUTER_MODELS, OpenRouter } from './openrouter';
 
 export {
   Anthropic,
@@ -10,8 +11,10 @@ export {
   Moonshot,
   OpenAI,
   OpenAICompatible,
+  OpenRouter,
   ANTHROPIC_MODELS,
   GEMINI_MODELS,
   MOONSHOT_MODELS,
   OPENAI_MODELS,
+  OPENROUTER_MODELS,
 };

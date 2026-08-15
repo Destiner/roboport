@@ -8,6 +8,7 @@ Built-in adapters:
 - OpenAI: `OpenAI`
 - Google Gemini: `Gemini`
 - Moonshot: `Moonshot`
+- OpenRouter: `OpenRouter`
 - OpenAI-compatible: `OpenAICompatible`
 
 ```ts
@@ -21,6 +22,21 @@ const agent = new Agent({
 ```
 
 `OpenAICompatible` targets any OpenAI-shaped endpoint via `baseUrl`. Thinking levels are unified across providers — `off | minimal | low | medium | high | xhigh` — and each adapter maps them onto its own wire format.
+
+## OpenRouter
+
+`OpenRouter` reaches every model in OpenRouter's catalogue behind one API key (`OPENROUTER_API_KEY`, or pass `apiKey`). Model names are the full `author/slug`.
+
+```ts
+import { OpenRouter } from 'roboport/models';
+
+const model = new OpenRouter('openai/gpt-5.6-luna', {
+  thinking: 'medium',
+  title: 'my-app', // optional attribution, sent as X-Title
+});
+```
+
+OpenRouter normalises reasoning across providers, so all six thinking levels pass straight through as `reasoning.effort` with no clamping. Reasoning that arrives as `reasoning_details` is replayed verbatim on later turns, which is what keeps a reasoning model coherent across a tool call. `searchWeb` uses the server-side `web` plugin and returns its `url_citation` annotations.
 
 ## Custom model
 

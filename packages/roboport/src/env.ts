@@ -22,6 +22,9 @@ export const env = {
   get openaiApiKey() {
     return read('OPENAI_API_KEY');
   },
+  get openRouterApiKey() {
+    return read('OPENROUTER_API_KEY');
+  },
   get openaiCodexAuthFile() {
     return read('ROBOPORT_OPENAI_CODEX_AUTH_FILE');
   },

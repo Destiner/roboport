@@ -5,6 +5,7 @@ import {
   type ModelStreamEvent,
   type StopReason,
   type ThinkingLevel,
+  type ThinkingPart,
 } from '@/core';
 import { readSse } from '@/core/stream';
 
@@ -33,21 +34,40 @@ interface ChatCompletionsToolCallDelta {
   function?: { name?: string; arguments?: string };
 }
 
+interface ChatCompletionsDelta {
+  role?: string;
+  content?: string | null;
+  reasoning_content?: string | null;
+  tool_calls?: ChatCompletionsToolCallDelta[];
+  // Providers that don't follow the `reasoning_content` convention put their
+  // reasoning elsewhere; subclasses read it via `createReasoningAccumulator`.
+  [key: string]: unknown;
+}
+
 interface ChatCompletionsStreamChunk {
   id?: string;
   choices?: {
-    delta?: {
-      role?: string;
-      content?: string | null;
-      reasoning_content?: string | null;
-      tool_calls?: ChatCompletionsToolCallDelta[];
-    };
+    delta?: ChatCompletionsDelta;
     finish_reason?: string | null;
   }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
   };
+}
+
+// Per-stream accumulator for providers whose reasoning arrives as structured
+// payloads that must be echoed back verbatim on the next turn (OpenRouter's
+// `reasoning_details`, say). Created fresh per `streamMessage` call so
+// concurrent streams on one adapter instance don't share state.
+interface ReasoningAccumulator {
+  // Consume one streamed delta; return any plaintext reasoning to surface as a
+  // `thinking-delta`, or undefined when the delta carries none.
+  push(delta: ChatCompletionsDelta): string | undefined;
+  // Opaque blob to hang off the resulting thinking part, replayed by
+  // `adaptAssistantWire` on subsequent turns. Undefined when there's nothing
+  // worth carrying.
+  finish(): string | undefined;
 }
 
 interface ToolCallBuilder {
@@ -134,6 +154,7 @@ abstract class OpenAICompatible extends Model {
         'content-type': 'application/json',
         authorization: `Bearer ${this.apiKey}`,
         accept: 'text/event-stream',
+        ...this.extraHeaders(),
       },
       body: JSON.stringify(body),
       signal,
@@ -156,6 +177,18 @@ abstract class OpenAICompatible extends Model {
     let sawFinishReason = false;
     const toolBuilders = new Map<number, ToolCallBuilder>();
     const toolOrder: number[] = [];
+    const reasoning = this.createReasoningAccumulator();
+
+    // `redactedData` carries the provider's opaque reasoning payload, so the
+    // next turn can replay it. Only computed once the thinking block closes.
+    function thinkingEnd(text: string): ModelStreamEvent {
+      const data = reasoning?.finish();
+      return {
+        type: 'thinking-end',
+        text,
+        ...(data !== undefined ? { redactedData: data } : {}),
+      };
+    }
 
     for await (const raw of readSse(response)) {
       const chunk = raw as ChatCompletionsStreamChunk;
@@ -174,17 +207,21 @@ abstract class OpenAICompatible extends Model {
 
       const delta = choice.delta;
       if (delta) {
-        const reasoning = delta.reasoning_content;
-        if (typeof reasoning === 'string' && reasoning.length > 0) {
+        const reasoningText = reasoning
+          ? reasoning.push(delta)
+          : typeof delta.reasoning_content === 'string'
+            ? delta.reasoning_content
+            : undefined;
+        if (reasoningText) {
           if (!thinkingOpen) thinkingOpen = true;
-          thinkingBuffer += reasoning;
-          yield { type: 'thinking-delta', text: reasoning };
+          thinkingBuffer += reasoningText;
+          yield { type: 'thinking-delta', text: reasoningText };
         }
 
         const content = delta.content;
         if (typeof content === 'string' && content.length > 0) {
           if (thinkingOpen) {
-            yield { type: 'thinking-end', text: thinkingBuffer };
+            yield thinkingEnd(thinkingBuffer);
             thinkingOpen = false;
             thinkingBuffer = '';
           }
@@ -231,7 +268,7 @@ abstract class OpenAICompatible extends Model {
       yield { type: 'text-end', text: textBuffer };
     }
     if (thinkingOpen) {
-      yield { type: 'thinking-end', text: thinkingBuffer };
+      yield thinkingEnd(thinkingBuffer);
     }
 
     for (const idx of toolOrder) {
@@ -274,6 +311,7 @@ abstract class OpenAICompatible extends Model {
       if (msg.role === 'assistant') {
         const texts: string[] = [];
         const toolCalls: OpenAIToolCall[] = [];
+        const thinking: ThinkingPart[] = [];
 
         for (const part of msg.content) {
           if (part.type === 'text') {
@@ -287,9 +325,12 @@ abstract class OpenAICompatible extends Model {
                 arguments: JSON.stringify(part.input ?? {}),
               },
             });
+          } else {
+            // No portable chat-completions representation, so the base drops
+            // thinking; `adaptAssistantWire` gets them in case the provider
+            // has one (and requires the round-trip).
+            thinking.push(part);
           }
-          // Thinking parts originate from Anthropic and have no OpenAI-compatible
-          // wire representation; drop them when serialising.
         }
 
         const assistantMsg: OpenAIAssistantWireMessage = {
@@ -297,7 +338,7 @@ abstract class OpenAICompatible extends Model {
           content: texts.length > 0 ? texts.join('\n') : null,
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
         };
-        wire.push(this.adaptAssistantWire(assistantMsg));
+        wire.push(this.adaptAssistantWire(assistantMsg, thinking));
         continue;
       }
 
@@ -315,8 +356,23 @@ abstract class OpenAICompatible extends Model {
 
   protected adaptAssistantWire(
     msg: OpenAIAssistantWireMessage,
+    thinking?: ThinkingPart[],
   ): OpenAIAssistantWireMessage {
+    void thinking;
     return msg;
+  }
+
+  // Extra request headers (attribution, provider routing). Merged after the
+  // standard ones, so a subclass can also override them.
+  protected extraHeaders(): Record<string, string> {
+    return {};
+  }
+
+  // Hook for providers whose reasoning does not arrive as `reasoning_content`,
+  // or that require the reasoning payload to be echoed back on later turns.
+  // Returning undefined keeps the plain `reasoning_content` behaviour.
+  protected createReasoningAccumulator(): ReasoningAccumulator | undefined {
+    return undefined;
   }
 
   // Hook for subclasses to map the unified `thinking` level onto provider-
@@ -328,4 +384,9 @@ abstract class OpenAICompatible extends Model {
   }
 }
 
-export { OpenAICompatible, type OpenAIAssistantWireMessage };
+export {
+  OpenAICompatible,
+  type ChatCompletionsDelta,
+  type OpenAIAssistantWireMessage,
+  type ReasoningAccumulator,
+};
